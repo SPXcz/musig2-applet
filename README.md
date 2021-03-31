@@ -103,7 +103,7 @@ This project uses mainly:
 - https://github.com/licel/jcardsim
 - Petr Svenda scripts 
 
-Big kudos for a great work!
+Kudos for a great work!
 
 ### JavaCard support
 
@@ -116,6 +116,17 @@ Thanks to Martin Paljak's [ant-javacard] and [oracle_javacard_sdks] we support:
 - JavaCard 3.0.4
 - JavaCard 3.0.5u1
 - JavaCard 3.1.0b43
+
+## Supported Java versions
+
+Java 8-u271 is the minimal version supported. 
+
+Make sure you have up to date java version (`-u` version) as older java 8 versions
+have problems with recognizing some certificates as valid.
+
+Only some Java versions are supported by the JavaCard SDKs.
+Check the following compatibility table for more info: 
+https://github.com/martinpaljak/ant-javacard/wiki/Version-compatibility
 
 ## Coverage
 
