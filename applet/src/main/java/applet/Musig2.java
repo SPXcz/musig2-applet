@@ -1,12 +1,9 @@
 package applet;
 
-import javacard.framework.ISO7816;
-import javacard.framework.ISOException;
-import javacard.framework.JCSystem;
-import javacard.framework.Util;
-import javacard.security.MessageDigest;
-import javacard.security.RandomData;
+import javacard.framework.*;
 import applet.jcmathlib.*;
+import javacard.security.RandomData;
+import javacard.security.MessageDigest;
 
 public class Musig2 {
 
@@ -102,7 +99,7 @@ public class Musig2 {
             ISOException.throwIt(Constants.E_TOO_MANY_PARTICIPANTS);
         }
 
-        if (offset + numberOfParticipants * Constants.POINT_LEN > publicShareList.length) {
+        if ((short)(offset + numberOfParticipants * Constants.POINT_LEN) > (short) publicShareList.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
