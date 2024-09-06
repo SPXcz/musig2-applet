@@ -15,6 +15,11 @@ public class Musig2Applet extends Applet {
     private Musig2 musig2;
     private Musig2[] otherCards;
 
+    public static void install(byte[] bArray, short bOffset, byte bLength) {
+        new Musig2Applet();
+    }
+    
+
     public Musig2Applet() {
         OperationSupport.getInstance().setCard(OperationSupport.SIMULATOR); // TODO set your card
         if (!OperationSupport.getInstance().DEFERRED_INITIALIZATION) {
