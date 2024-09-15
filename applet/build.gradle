@@ -42,9 +42,9 @@ repositories {
 
 // Dependencies for your project
 dependencies {
-    jcardsim 'com.klinec:jcardsim:3.0.5.11'
+    jcardsim 'com.klinec:jcardsim:3.0.6.0'
 
-    implementation 'com.klinec:jcardsim:3.0.5.11'
+    implementation 'com.klinec:jcardsim:3.0.6.0'
 
     testImplementation 'org.testng:testng:6.1.1'
     testImplementation 'org.slf4j:slf4j-api:1.7.33'
@@ -61,6 +61,10 @@ dependencies {
     testImplementation 'org.json:json:20180130'
     testImplementation 'commons-codec:commons-codec:1.15'
     testImplementation group: 'org.mockito', name: 'mockito-core', version: '2.1.0'
+
+    testImplementation(group: 'com.klinec', name: 'javacard-tools', version: '1.0.4') {
+        exclude group: "com.klinec", module: "jcardsim"
+    }
 
     // Include plugin as it has bundled GP & other tools.
     // Alternative: include GP manually, but the included
@@ -86,18 +90,6 @@ task dumpClassPath(dependsOn: ['idea']) {
 
 application {
     mainClass = 'main.ClientApp'
-}
-
-jar {
-    duplicatesStrategy = 'exclude'
-    exclude('META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
-
-    manifest {
-        attributes 'Main-Class': 'main.ClientApp'
-    }
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
 }
 
 
@@ -152,7 +144,7 @@ javacard {
         cap {
             packageName 'applet'
             version '0.5'
-            aid '01:ff:ff:04:05:06:07:08:10'
+            aid '01:ff:ff:04:05:06:07:08:11'
             output 'applet.cap'
 
             dependencies {
@@ -163,7 +155,7 @@ javacard {
             // Here you can specify path to the SDK you want to use.
             // Only JC304 and higher are supported for targeting.
             // If JC310b43 is not used, targetsdk cannot be set.
-            targetsdk JC310b43
+            targetsdk JC305
 
             // Override java bytecode version if needed.
             // javaversion '1.7'
@@ -171,7 +163,7 @@ javacard {
             //noinspection GroovyAssignabilityCheck
             applet {
                 className 'applet.Musig2Applet'
-                aid '01:ff:ff:04:05:06:07:08:10:01:02'
+                aid '01:ff:ff:04:05:06:07:08:11:01:02'
             }
         }
     }

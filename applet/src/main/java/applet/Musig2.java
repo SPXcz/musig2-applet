@@ -1,9 +1,9 @@
 package applet;
 
 import javacard.framework.*;
-import applet.jcmathlib.*;
 import javacard.security.RandomData;
 import javacard.security.MessageDigest;
+import applet.jcmathlib.*;
 
 public class Musig2 {
 
@@ -31,6 +31,37 @@ public class Musig2 {
     private BigNat coefA;
     private BigNat[] nonceState;
     private short numberOfParticipants;
+
+    // Test values
+    final static byte[] ECPOINT_TEST_VALUE = {
+            (byte) 0x04,
+            (byte) 0x3b, (byte) 0xc1, (byte) 0x5b, (byte) 0xe5,
+            (byte) 0xf7, (byte) 0x52, (byte) 0xb3, (byte) 0x27,
+            (byte) 0x0d, (byte) 0xb0, (byte) 0xae, (byte) 0xf2,
+            (byte) 0xbc, (byte) 0xf0, (byte) 0xec, (byte) 0xbd,
+            (byte) 0xb5, (byte) 0x78, (byte) 0x8f, (byte) 0x88,
+            (byte) 0xe6, (byte) 0x14, (byte) 0x32, (byte) 0x30,
+            (byte) 0x68, (byte) 0xc4, (byte) 0xc4, (byte) 0x88,
+            (byte) 0x6b, (byte) 0x43, (byte) 0x91, (byte) 0x4c,
+            (byte) 0x22, (byte) 0xe1, (byte) 0x67, (byte) 0x68,
+            (byte) 0x3b, (byte) 0x32, (byte) 0x95, (byte) 0x98,
+            (byte) 0x31, (byte) 0x19, (byte) 0x6d, (byte) 0x41,
+            (byte) 0x88, (byte) 0x0c, (byte) 0x9f, (byte) 0x8c,
+            (byte) 0x59, (byte) 0x67, (byte) 0x60, (byte) 0x86,
+            (byte) 0x1a, (byte) 0x86, (byte) 0xf8, (byte) 0x0d,
+            (byte) 0x01, (byte) 0x46, (byte) 0x0c, (byte) 0xb5,
+            (byte) 0x8d, (byte) 0x86, (byte) 0x6c, (byte) 0x09
+    };
+    final static byte[] SCALAR_TEST_VALUE = {
+            (byte) 0xe8, (byte) 0x05, (byte) 0xe8, (byte) 0x02,
+            (byte) 0xbf, (byte) 0xec, (byte) 0xee, (byte) 0x91,
+            (byte) 0x9b, (byte) 0x3d, (byte) 0x3b, (byte) 0xd8,
+            (byte) 0x3c, (byte) 0x7b, (byte) 0x52, (byte) 0xa5,
+            (byte) 0xd5, (byte) 0x35, (byte) 0x4c, (byte) 0x4c,
+            (byte) 0x06, (byte) 0x89, (byte) 0x80, (byte) 0x54,
+            (byte) 0xb9, (byte) 0x76, (byte) 0xfa, (byte) 0xb1,
+            (byte) 0xd3, (byte) 0x5a, (byte) 0x10, (byte) 0x91
+    };
 
     public Musig2(ECCurve curve, ResourceManager rm) {
 
@@ -81,11 +112,8 @@ public class Musig2 {
 
     // Only max. 32B (or the length of a secret key share)
     private void getRandomBigNat (BigNat outBigNat) {
-        rng.nextBytes(rngArray, (short) 0, (short) rngArray.length);
-        outBigNat.fromByteArray(rngArray, (short) 0, (short) rngArray.length);
-
-        // Erase generated private key share from the array for security
-        Util.arrayFill(rngArray, (short) 0, (short) rngArray.length, (byte) 0x00);
+        rng.nextBytes(rngArray, (short) 0, Constants.SHARE_LEN);
+        outBigNat.fromByteArray(rngArray, (short) 0, Constants.SHARE_LEN);
     }
 
     // Can be done off card
