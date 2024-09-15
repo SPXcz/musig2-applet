@@ -13,55 +13,27 @@ public class Musig2 {
 
     // Data storage
     private byte[] digestHelper;
-    private byte[] rngArray;
+    private byte[] tmpArray;
     private ECPoint tmpPoint;
 
     // States
     private byte stateReadyForSigning;
     private byte stateCurrentSigComplete;
     private byte stateKeysEstablished;
+    private byte stateNoncesAggregated;
 
     // Crypto arguments
     private ECCurve curve;
     private ECPoint publicShare;
     private ECPoint groupPubKey;
+    private ECPoint coefR; // Temporary attribute
     private ECPoint[] nonceOut;
     private ECPoint[] nonceAggregate;
     private BigNat secretShare;
     private BigNat coefA;
+    private BigNat coefB; // Temporary attribute
     private BigNat[] nonceState;
     private short numberOfParticipants;
-
-    // Test values
-    final static byte[] ECPOINT_TEST_VALUE = {
-            (byte) 0x04,
-            (byte) 0x3b, (byte) 0xc1, (byte) 0x5b, (byte) 0xe5,
-            (byte) 0xf7, (byte) 0x52, (byte) 0xb3, (byte) 0x27,
-            (byte) 0x0d, (byte) 0xb0, (byte) 0xae, (byte) 0xf2,
-            (byte) 0xbc, (byte) 0xf0, (byte) 0xec, (byte) 0xbd,
-            (byte) 0xb5, (byte) 0x78, (byte) 0x8f, (byte) 0x88,
-            (byte) 0xe6, (byte) 0x14, (byte) 0x32, (byte) 0x30,
-            (byte) 0x68, (byte) 0xc4, (byte) 0xc4, (byte) 0x88,
-            (byte) 0x6b, (byte) 0x43, (byte) 0x91, (byte) 0x4c,
-            (byte) 0x22, (byte) 0xe1, (byte) 0x67, (byte) 0x68,
-            (byte) 0x3b, (byte) 0x32, (byte) 0x95, (byte) 0x98,
-            (byte) 0x31, (byte) 0x19, (byte) 0x6d, (byte) 0x41,
-            (byte) 0x88, (byte) 0x0c, (byte) 0x9f, (byte) 0x8c,
-            (byte) 0x59, (byte) 0x67, (byte) 0x60, (byte) 0x86,
-            (byte) 0x1a, (byte) 0x86, (byte) 0xf8, (byte) 0x0d,
-            (byte) 0x01, (byte) 0x46, (byte) 0x0c, (byte) 0xb5,
-            (byte) 0x8d, (byte) 0x86, (byte) 0x6c, (byte) 0x09
-    };
-    final static byte[] SCALAR_TEST_VALUE = {
-            (byte) 0xe8, (byte) 0x05, (byte) 0xe8, (byte) 0x02,
-            (byte) 0xbf, (byte) 0xec, (byte) 0xee, (byte) 0x91,
-            (byte) 0x9b, (byte) 0x3d, (byte) 0x3b, (byte) 0xd8,
-            (byte) 0x3c, (byte) 0x7b, (byte) 0x52, (byte) 0xa5,
-            (byte) 0xd5, (byte) 0x35, (byte) 0x4c, (byte) 0x4c,
-            (byte) 0x06, (byte) 0x89, (byte) 0x80, (byte) 0x54,
-            (byte) 0xb9, (byte) 0x76, (byte) 0xfa, (byte) 0xb1,
-            (byte) 0xd3, (byte) 0x5a, (byte) 0x10, (byte) 0x91
-    };
 
     public Musig2(ECCurve curve, ResourceManager rm) {
 
@@ -71,17 +43,20 @@ public class Musig2 {
         rng = RandomData.getInstance(RandomData.ALG_KEYGENERATION);
 
         // Helper attributes
-        coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        rngArray = JCSystem.makeTransientByteArray(Constants.SHARE_LEN, JCSystem.CLEAR_ON_DESELECT);
+        tmpArray = JCSystem.makeTransientByteArray(Constants.POINT_LEN, JCSystem.CLEAR_ON_DESELECT);
         tmpPoint = new ECPoint(curve);
         stateReadyForSigning = Constants.STATE_FALSE;
         stateCurrentSigComplete = Constants.STATE_FALSE; // Controls whether the signature sequence has been completed.
+        stateNoncesAggregated = Constants.STATE_FALSE;
 
         // Main Attributes
         this.curve = curve;
         groupPubKey = new ECPoint(curve);
         publicShare = new ECPoint(curve);
+        coefR = new ECPoint(curve);
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
+        coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+        coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         nonceOut = new ECPoint[Constants.V];
         nonceState = new BigNat[Constants.V];
         nonceAggregate = new ECPoint[Constants.V];
@@ -97,7 +72,7 @@ public class Musig2 {
         if (curve == null
                 || publicShare == null
                 || secretShare == null
-                || rngArray == null) {
+                || tmpArray == null) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             return;
         }
@@ -112,11 +87,12 @@ public class Musig2 {
 
     // Only max. 32B (or the length of a secret key share)
     private void getRandomBigNat (BigNat outBigNat) {
-        rng.nextBytes(rngArray, (short) 0, Constants.SHARE_LEN);
-        outBigNat.fromByteArray(rngArray, (short) 0, Constants.SHARE_LEN);
+        rng.nextBytes(tmpArray, (short) 0, Constants.SHARE_LEN);
+        outBigNat.fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
     }
 
     // Can be done off card
+    // The last public share is the share of this card. Should be done correctly in the integrated version.
     public void combinePubKeyShares (byte[] publicShareList, short offset, short numberOfParticipants) {
 
         if (numberOfParticipants == 0) {
@@ -135,6 +111,8 @@ public class Musig2 {
         short pubKeyShareOffset = offset;
 
         // Init first point in the sum
+        // In this version of the card (with all operations on the card), the last coefA attribute
+        // is considered the coefA attribute of this card. This will not be the case in the integrated version.
         aggregatedCoefs(publicShareList, pubKeyShareOffset, digestHelper);
         coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
         groupPubKey.setW(publicShareList, pubKeyShareOffset, Constants.POINT_LEN);
@@ -213,6 +191,69 @@ public class Musig2 {
                 nonceAggregate[k].add(tmpPoint);
                 currentOffset += Constants.POINT_LEN;
             }
+        }
+
+        stateNoncesAggregated = Constants.STATE_TRUE;
+    }
+
+    public void sign (byte[] messageBuffer, short offset, short length) {
+
+        if (length > Constants.MAX_MESSAGE_LEN) {
+            ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
+            return;
+        }
+
+        if ((short) (offset + length) > (short) messageBuffer.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+            return;
+        }
+
+        generateCoefB(messageBuffer, offset, length);
+    }
+
+    private void generateCoefB (byte[] messageBuffer, short offset, short length) {
+
+        if (stateNoncesAggregated == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+            return;
+        }
+
+        // Hash public key
+        groupPubKey.getW(tmpArray, (short) 0);
+        digest.update(tmpArray, (short) 0, Constants.SHARE_LEN);
+
+        // Hash public aggregated nonces
+        for (short i = 0; i < Constants.V; i++) {
+            nonceAggregate[i].getW(tmpArray, (short) 0);
+            digest.update(tmpArray, (short) 0, Constants.POINT_LEN);
+        }
+
+        // Hash the message to be signed
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
+        coefB.fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
+        digest.reset();
+    }
+
+    private void generateCoefR () {
+
+        if (stateNoncesAggregated == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+            return;
+        }
+
+        // Initalize R using R1
+        nonceAggregate[0].getW(tmpArray, (short) 0);
+        coefR.setW(tmpArray, (short) 0, Constants.POINT_LEN);
+
+        // Optimized operation for V = 2
+        coefR.multAndAdd(coefB, nonceAggregate[1]);
+
+        // Only for V = 4
+        //TODO: Do for V = 4
+        for (short i = 2; i < Constants.V; i++) {
+            nonceAggregate[i].getW(tmpArray, (short) 0);
+            //2*b*R
+            //3*b*R
         }
     }
 
