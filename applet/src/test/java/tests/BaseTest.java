@@ -1,5 +1,6 @@
 package tests;
 
+import applet.Musig2Applet;
 import cardTools.CardManager;
 import cardTools.CardType;
 import cardTools.RunConfig;
@@ -50,8 +51,42 @@ public class BaseTest {
         return connectRaw(installData);
     }
 
-    public CardManager connectRaw(byte[] installData) {
-        return null;
+    public CardManager connectRaw(byte[] installData) throws Exception {
+        final CardManager cardMngr = new CardManager(true, APPLET_AID_BYTE);
+        final RunConfig runCfg = RunConfig.getDefaultConfig();
+        System.setProperty("com.licel.jcardsim.object_deletion_supported", "1");
+        System.setProperty("com.licel.jcardsim.sign.dsasigner.computedhash", "1");
+
+        // Set to statically seed RandomData in the applet by "02", hexcoded
+        // System.setProperty("com.licel.jcardsim.randomdata.seed", "02");
+
+        // Set to seed RandomData from the SecureRandom
+        // System.setProperty("com.licel.jcardsim.randomdata.secure", "1");
+
+        runCfg.setTestCardType(cardType);
+
+        // Running on physical card
+        if (cardType == CardType.REMOTE){
+            runCfg.setRemoteAddress("http://127.0.0.1:9901");
+
+            runCfg.setRemoteCardType(CardType.PHYSICAL);
+            // runCfg.setRemoteCardType(CardType.JCARDSIMLOCAL);
+
+            runCfg.setAid(APPLET_AID_BYTE);  // performs select after connect
+
+        } else if (cardType != CardType.PHYSICAL && cardType != CardType.PHYSICAL_JAVAX) {
+            // Running in the simulator
+            runCfg.setAppletToSimulate(Musig2Applet.class)
+                    .setTestCardType(CardType.JCARDSIMLOCAL)
+                    .setbReuploadApplet(true)
+                    .setInstallData(installData);
+        }
+
+        if (!cardMngr.connect(runCfg)) {
+            throw new RuntimeException("Connection failed");
+        }
+
+        return cardMngr;
     }
 
     /**

@@ -1,5 +1,7 @@
 package main;
 
+import applet.Constants;
+import applet.HelloWorldApplet;
 import applet.Musig2Applet;
 import com.licel.jcardsim.smartcardio.CardSimulator;
 import com.licel.jcardsim.utils.AIDUtil;
@@ -19,10 +21,11 @@ public class Run {
         simulator.selectApplet(appletAID);
 
         // 4. send APDU
-        CommandAPDU commandAPDU = new CommandAPDU(0x00, 0x90, 0x00, 0x00);
+        CommandAPDU commandAPDU = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0x00, 0x00);
         ResponseAPDU response = simulator.transmitCommand(commandAPDU);
 
         System.out.println(new String(response.getData()));
+        System.out.println(response.getSW());
     }
 
 }
