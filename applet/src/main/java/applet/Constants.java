@@ -6,12 +6,13 @@ public class Constants {
     public static final short MAX_PARTICIPATS = (short) 3; // Should be higher in the future
 
     // Settings
-    public static final short V = (short) 2; // Musig 2 attribute. Either 2 or 4.
+    public static final short V = (short) 2; // Musig 2 attribute. Either 2 or 4. V = 4 currently isn't fully supported.
     public static final short FULL_LEN = (short) 256;
     public static final short HASH_LEN = (short) 32;
     public static final short SHARE_LEN = (short) 32; //32
     public static final short POINT_LEN = (short) 65;
     public static final short MAX_PSHARE_LIST_LEN = (short) (MAX_PARTICIPATS * POINT_LEN);
+    public static final short MAX_MESSAGE_LEN = (short) 255;
 
     // Class
     public static final byte CLA_MUSIG2 = (byte) 0xA6;
@@ -33,6 +34,7 @@ public class Constants {
     public static final byte E_TOO_MANY_PARTICIPANTS = (byte) 0x4F;
     public static final byte E_BUFFER_OVERLOW = (byte) 0xCA;
     public static final byte E_CRYPTO_EXCEPTION = (byte) 0x77;
+    public static final byte E_MESSAGE_TOO_LONG = (byte) 0x88;
 
     // Testing
 
