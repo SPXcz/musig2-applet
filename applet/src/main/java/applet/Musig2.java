@@ -18,7 +18,6 @@ public class Musig2 {
 
     // States
     private byte stateReadyForSigning;
-    private byte stateCurrentSigComplete;
     private byte stateKeysEstablished;
     private byte stateNoncesAggregated;
 
@@ -46,7 +45,6 @@ public class Musig2 {
         tmpArray = JCSystem.makeTransientByteArray(Constants.POINT_LEN, JCSystem.CLEAR_ON_DESELECT);
         tmpPoint = new ECPoint(curve);
         stateReadyForSigning = Constants.STATE_FALSE;
-        stateCurrentSigComplete = Constants.STATE_FALSE; // Controls whether the signature sequence has been completed.
         stateNoncesAggregated = Constants.STATE_FALSE;
 
         // Main Attributes
@@ -152,7 +150,6 @@ public class Musig2 {
 
         //TODO: Udelat state machine
         stateReadyForSigning = Constants.STATE_TRUE;
-        stateCurrentSigComplete = Constants.STATE_TRUE;
 
     }
 
@@ -198,6 +195,10 @@ public class Musig2 {
 
     public void sign (byte[] messageBuffer, short offset, short length) {
 
+        if (stateReadyForSigning == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+
         if (length > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return;
@@ -209,6 +210,11 @@ public class Musig2 {
         }
 
         generateCoefB(messageBuffer, offset, length);
+        generateCoefR();
+
+        // .....
+
+        stateReadyForSigning = Constants.STATE_FALSE;
     }
 
     private void generateCoefB (byte[] messageBuffer, short offset, short length) {
