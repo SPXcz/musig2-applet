@@ -1,5 +1,8 @@
 package cardTools;
 
+import com.licel.jcardsim.smartcardio.CardSimulator;
+import javacard.framework.Applet;
+
 /**
  * Applet run configuration.
  *
@@ -8,22 +11,23 @@ package cardTools;
 public class RunConfig {
     int targetReaderIndex = 0;
     public int numRepeats = 1;
-    public Class appletToSimulate;
+    public Class<? extends Applet> appletToSimulate;
     boolean bReuploadApplet = false;
     byte[] installData = null;
-    
-    public enum CARD_TYPE {
-        PHYSICAL, JCOPSIM, JCARDSIMLOCAL, JCARDSIMREMOTE
-    }
+    byte[] aid = null;
+    CardSimulator simulator = null;
+    String remoteAddress;
+    boolean remoteDisconnectPrevious = false;
 
-    public CARD_TYPE testCardType = CARD_TYPE.PHYSICAL;
-    
+    public CardType testCardType = CardType.PHYSICAL;
+    public CardType remoteCardType = CardType.PHYSICAL;
+
     public static RunConfig getDefaultConfig() {
         RunConfig runCfg = new RunConfig();
         runCfg.targetReaderIndex = 0;
-        runCfg.testCardType = CARD_TYPE.PHYSICAL;
+        runCfg.testCardType = CardType.PHYSICAL;
         runCfg.appletToSimulate = null;
-        
+
         return runCfg;
     }
 
@@ -47,7 +51,7 @@ public class RunConfig {
         return installData;
     }
 
-    public CARD_TYPE getTestCardType() {
+    public CardType getTestCardType() {
         return testCardType;
     }
 
@@ -61,7 +65,7 @@ public class RunConfig {
         return this;
     }
 
-    public RunConfig setAppletToSimulate(Class appletToSimulate) {
+    public RunConfig setAppletToSimulate(Class<? extends Applet> appletToSimulate) {
         this.appletToSimulate = appletToSimulate;
         return this;
     }
@@ -76,8 +80,53 @@ public class RunConfig {
         return this;
     }
 
-    public RunConfig setTestCardType(CARD_TYPE testCardType) {
+    public RunConfig setTestCardType(CardType testCardType) {
         this.testCardType = testCardType;
+        return this;
+    }
+
+    public byte[] getAid() {
+        return aid;
+    }
+
+    public RunConfig setAid(byte[] aid) {
+        this.aid = aid;
+        return this;
+    }
+
+    public CardSimulator getSimulator() {
+        return simulator;
+    }
+
+    public RunConfig setSimulator(CardSimulator simulator) {
+        this.simulator = simulator;
+        return this;
+    }
+
+    public String getRemoteAddress() {
+        return remoteAddress;
+    }
+
+    public RunConfig setRemoteAddress(String remoteAddress) {
+        this.remoteAddress = remoteAddress;
+        return this;
+    }
+
+    public CardType getRemoteCardType() {
+        return remoteCardType;
+    }
+
+    public RunConfig setRemoteCardType(CardType remoteCardType) {
+        this.remoteCardType = remoteCardType;
+        return this;
+    }
+
+    public boolean isRemoteDisconnectPrevious() {
+        return remoteDisconnectPrevious;
+    }
+
+    public RunConfig setRemoteDisconnectPrevious(boolean remoteDisconnectPrevious) {
+        this.remoteDisconnectPrevious = remoteDisconnectPrevious;
         return this;
     }
 }

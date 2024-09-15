@@ -2,8 +2,12 @@ package applet;
 
 import javacard.framework.*;
 import applet.jcmathlib.*;
+import applet.jcmathlib.SecP256k1;
+import javacard.security.CryptoException;
 
 public class Musig2Applet extends Applet {
+
+    public final static short CARD_TYPE = OperationSupport.SIMULATOR;
 
     // Utils
     private boolean initialized = false;
@@ -16,15 +20,15 @@ public class Musig2Applet extends Applet {
     private Musig2[] otherCards;
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
-        new Musig2Applet();
+        new Musig2Applet(bArray, bOffset, bLength);
     }
-    
 
-    public Musig2Applet() {
-        OperationSupport.getInstance().setCard(OperationSupport.SIMULATOR); // TODO set your card
-        if (!OperationSupport.getInstance().DEFERRED_INITIALIZATION) {
+    public Musig2Applet(byte[] bArray, short bOffset, byte bLength) {
+        OperationSupport.getInstance().setCard(CARD_TYPE);
+        if(!OperationSupport.getInstance().DEFERRED_INITIALIZATION) {
             initialize();
         }
+        register();
     }
 
     public void initialize() {
@@ -34,20 +38,24 @@ public class Musig2Applet extends Applet {
 
         // Helper attributes
         rm = new ResourceManager(Constants.FULL_LEN);
-        curve = new ECCurve(SecP256r1.p, SecP256r1.a, SecP256r1.b, SecP256r1.G, SecP256r1.r, rm);
+        curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
+        rm.fixModSqMod(curve.rBN);
         musig2 = new Musig2(curve, rm);
-        publicShareList = JCSystem.makeTransientByteArray(Constants.MAX_PSHARE_LIST_LEN, JCSystem.CLEAR_ON_DESELECT);
+        //publicShareList = JCSystem.makeTransientByteArray(Constants.MAX_PSHARE_LIST_LEN, JCSystem.CLEAR_ON_DESELECT);
 
         // Only for testing purposes
         otherCards = new Musig2[Constants.MAX_PARTICIPATS - 1];
 
-        musig2.generateKeySharePair();
-
-        for (short i = 0; i < Constants.MAX_PARTICIPATS - 1; i++) {
-            otherCards[i].generateKeySharePair();
-        }
-
         initialized = true;
+    }
+
+    public void generateKeys () {
+        musig2.generateKeySharePair();
+        //for (short i = 0; i < Constants.MAX_PARTICIPATS - 1; i++) {
+        //    otherCards[i].generateKeySharePair();
+        //}
+
+        ISOException.throwIt(ISO7816.SW_NO_ERROR);
     }
 
     private void combineKeyShares(APDU apdu) {
@@ -128,27 +136,36 @@ public class Musig2Applet extends Applet {
 
         if (apdu.getBuffer()[ISO7816.OFFSET_CLA] != Constants.CLA_MUSIG2) {
             ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
+            return;
         }
 
-        switch (apdu.getBuffer()[ISO7816.OFFSET_INS]) {
-            case Constants.INS_COMBINE_SHARES:
-                combineKeyShares(apdu);
-                break;
-            case Constants.INS_GENERATE_NONCES:
-                generateNonces();
-                break;
-            case Constants.INS_COMBINE_NONCES:
-                combineNonces(apdu);
-                break;
-            case Constants.INS_GET_PKEY_SHARE:
-                getPublicKeyShare(apdu);
-                break;
-            case Constants.INS_GET_PNONCE_SHARE:
-                getPublicNonceShare(apdu);
-                break;
-            default:
-                ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
-                return;
+        try {
+            switch (apdu.getBuffer()[ISO7816.OFFSET_INS]) {
+                case Constants.INS_GENERATE_KEYS:
+                    generateKeys();
+                    break;
+                case Constants.INS_COMBINE_SHARES:
+                    combineKeyShares(apdu);
+                    break;
+                case Constants.INS_GENERATE_NONCES:
+                    generateNonces();
+                    break;
+                case Constants.INS_COMBINE_NONCES:
+                    combineNonces(apdu);
+                    break;
+                case Constants.INS_GET_PKEY_SHARE:
+                    getPublicKeyShare(apdu);
+                    break;
+                case Constants.INS_GET_PNONCE_SHARE:
+                    getPublicNonceShare(apdu);
+                    break;
+                default:
+                    ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
+                    return;
+            }
+        } catch (CryptoException e) {
+            ISOException.throwIt(Constants.E_CRYPTO_EXCEPTION);
         }
+
     }
 }
