@@ -24,6 +24,7 @@ public class Constants {
     public static final byte INS_GET_PNONCE_SHARE = (byte) 0x35;
     public static final byte INS_GENERATE_NONCES = (byte) 0x5E;
     public static final byte INS_COMBINE_NONCES = (byte) 0x6F;
+    public static final byte INS_SIGN = (byte) 0x49;
 
     // States
     public static final byte STATE_TRUE = (byte) 0xF4;
