@@ -4,6 +4,7 @@ import javacard.framework.*;
 import javacard.security.RandomData;
 import javacard.security.MessageDigest;
 import applet.jcmathlib.*;
+import org.omg.CORBA.PRIVATE_MEMBER;
 
 public class Musig2 {
 
@@ -15,6 +16,7 @@ public class Musig2 {
     private byte[] digestHelper;
     private byte[] tmpArray;
     private ECPoint tmpPoint;
+    private BigNat tmpBigNat;
 
     // States
     private byte stateReadyForSigning;
@@ -22,15 +24,20 @@ public class Musig2 {
     private byte stateNoncesAggregated;
 
     // Crypto arguments
+    // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15)
+    // https://eprint.iacr.org/2020/1261.pdf
     private ECCurve curve;
     private ECPoint publicShare;
     private ECPoint groupPubKey;
-    private ECPoint coefR; // Temporary attribute
+    private ECPoint coefR; // Temporary attribute (clear after sig complete)
     private ECPoint[] nonceOut;
     private ECPoint[] nonceAggregate;
     private BigNat secretShare;
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
+    private BigNat coefC; // Temporary attribute
+    private BigNat partialSig;
+    private BigNat modulo; // TODO: Je rBN spravny atribut?
     private BigNat[] nonceState;
     private short numberOfParticipants;
 
@@ -49,12 +56,16 @@ public class Musig2 {
 
         // Main Attributes
         this.curve = curve;
+        modulo = this.curve.rBN;
         groupPubKey = new ECPoint(curve);
         publicShare = new ECPoint(curve);
         coefR = new ECPoint(curve);
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        coefC = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+        tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         nonceOut = new ECPoint[Constants.V];
         nonceState = new BigNat[Constants.V];
         nonceAggregate = new ECPoint[Constants.V];
@@ -193,28 +204,41 @@ public class Musig2 {
         stateNoncesAggregated = Constants.STATE_TRUE;
     }
 
-    public void sign (byte[] messageBuffer, short offset, short length) {
+    public short sign (byte[] messageBuffer,
+                      short inOffset,
+                      short inLength,
+                      byte[] outBuffer,
+                      short outOffset) {
 
         if (stateReadyForSigning == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        if (length > Constants.MAX_MESSAGE_LEN) {
+        if (inLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
-            return;
+            return (short) -1;
         }
 
-        if ((short) (offset + length) > (short) messageBuffer.length) {
+        if ((short) (inOffset + inLength) > (short) messageBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
-            return;
+            return (short) -1;
         }
 
-        generateCoefB(messageBuffer, offset, length);
-        generateCoefR();
+        if ((short) (outOffset + Constants.POINT_LEN + Constants.SHARE_LEN) > (short) outBuffer.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+            return (short) -1;
+        }
 
-        // .....
+        generateCoefB(messageBuffer, inOffset, inLength);
+        generateCoefR();
+        generateCoefC(messageBuffer, inOffset, inLength);
+        signPartially(messageBuffer, inOffset, inLength);
+
+        writePartialSignatureOut(outBuffer, outOffset);
 
         stateReadyForSigning = Constants.STATE_FALSE;
+
+        return (short) (Constants.POINT_LEN + Constants.SHARE_LEN);
     }
 
     private void generateCoefB (byte[] messageBuffer, short offset, short length) {
@@ -225,18 +249,16 @@ public class Musig2 {
         }
 
         // Hash public key
-        groupPubKey.getW(tmpArray, (short) 0);
-        digest.update(tmpArray, (short) 0, Constants.SHARE_LEN);
+        digestPoint(groupPubKey);
 
         // Hash public aggregated nonces
         for (short i = 0; i < Constants.V; i++) {
-            nonceAggregate[i].getW(tmpArray, (short) 0);
-            digest.update(tmpArray, (short) 0, Constants.POINT_LEN);
+            digestPoint(nonceAggregate[i]);
         }
 
         // Hash the message to be signed
         digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
-        coefB.fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
+        coefB.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
         digest.reset();
     }
 
@@ -248,8 +270,7 @@ public class Musig2 {
         }
 
         // Initalize R using R1
-        nonceAggregate[0].getW(tmpArray, (short) 0);
-        coefR.setW(tmpArray, (short) 0, Constants.POINT_LEN);
+        coefR.copy(nonceAggregate[0]);
 
         // Optimized operation for V = 2
         coefR.multAndAdd(coefB, nonceAggregate[1]);
@@ -257,10 +278,54 @@ public class Musig2 {
         // Only for V = 4
         //TODO: Do for V = 4
         for (short i = 2; i < Constants.V; i++) {
-            nonceAggregate[i].getW(tmpArray, (short) 0);
             //2*b*R
             //3*b*R
         }
+    }
+
+    // Similar to generateCoefB
+    private void generateCoefC (byte[] messageBuffer, short offset, short length) {
+
+        if (stateNoncesAggregated == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+            return;
+        }
+
+        // Hash public key
+        digestPoint(groupPubKey);
+
+        // Hash temporary R attribute
+        digestPoint(coefR);
+
+        // Hash the message
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
+        coefC.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
+        digest.reset();
+    }
+
+    // Creates the partial signature itself
+    // Currently only for V = 2
+    private void signPartially (byte[] messageBuffer, short offset, short length) {
+        partialSig.copy(coefC);
+        partialSig.modMult(coefA, modulo); // TODO: Je modulo fixovane, kdyz jsem pouzil  rm.fixModSqMod(curve.rBN)?
+        partialSig.modMult(secretShare, modulo);
+        partialSig.modAdd(nonceState[0], modulo);
+
+        tmpBigNat.copy(coefB);
+        tmpBigNat.modMult(nonceState[1], modulo);
+
+        partialSig.modAdd(tmpBigNat, modulo);
+    }
+
+    // Format: R + s
+    private void writePartialSignatureOut (byte[] outbuffer, short offset) {
+        coefR.getW(outbuffer, offset);
+        partialSig.copyToByteArray(outbuffer, (short) (offset + Constants.POINT_LEN));
+    }
+
+    private void digestPoint (ECPoint point) {
+        point.getW(tmpArray, (short) 0);
+        digest.update(tmpArray, (short) 0, Constants.POINT_LEN);
     }
 
     public void getPublicKeyShare(byte[] buffer, short offset) {

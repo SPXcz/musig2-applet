@@ -117,6 +117,18 @@ public class Musig2Applet extends Applet {
         apdu.setOutgoingLength((short) (Constants.POINT_LEN * Constants.V));
     }
 
+    private void sign(APDU apdu) {
+        byte[] apduBuffer = apdu.getBuffer();
+        short outLen = musig2.sign(apduBuffer,
+                ISO7816.OFFSET_CDATA,
+                apdu.getIncomingLength(),
+                apduBuffer,
+                ISO7816.OFFSET_CDATA);
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength(outLen);
+    }
+
     public boolean select() {
         if(initialized) {
             curve.updateAfterReset();
@@ -158,6 +170,9 @@ public class Musig2Applet extends Applet {
                     break;
                 case Constants.INS_GET_PNONCE_SHARE:
                     getPublicNonceShare(apdu);
+                    break;
+                case Constants.INS_SIGN:
+                    sign(apdu);
                     break;
                 default:
                     ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
