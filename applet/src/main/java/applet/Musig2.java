@@ -101,8 +101,10 @@ public class Musig2 {
     }
 
     // Can be done off card
+    // Sorting offcard - lexicological order.
     // The last public share is the share of this card. Should be done correctly in the integrated version.
-    public void combinePubKeyShares (byte[] publicShareList, short offset, short numberOfParticipants) {
+    // TODO: Mam resit tweaks?
+    public void combinePubKeyShares (byte[] publicShareListX, short offset, short numberOfParticipants) {
 
         if (numberOfParticipants == 0) {
             ISOException.throwIt(Constants.E_TOO_FEW_PARTICIPANTS);
@@ -112,36 +114,97 @@ public class Musig2 {
             ISOException.throwIt(Constants.E_TOO_MANY_PARTICIPANTS);
         }
 
-        if ((short)(offset + numberOfParticipants * Constants.POINT_LEN) > (short) publicShareList.length) {
+        if ((short)(offset + numberOfParticipants * Constants.XCORD_LEN) > (short) publicShareListX.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         this.numberOfParticipants = numberOfParticipants;
         short pubKeyShareOffset = offset;
+        short secondKeyOffset = getSecondKey(publicShareListX, offset);
 
         // Init first point in the sum
-        // In this version of the card (with all operations on the card), the last coefA attribute
-        // is considered the coefA attribute of this card. This will not be the case in the integrated version.
-        aggregatedCoefs(publicShareList, pubKeyShareOffset, digestHelper);
-        coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
-        groupPubKey.setW(publicShareList, pubKeyShareOffset, Constants.POINT_LEN);
-        groupPubKey.multiplication(coefA);
+        // TODO: Je XCORD format spravne? (1 + 32 B)
+        // TODO: fromX by melo hodit chybu, kdyz bod nejde sestrojit (podle BIP)
+        groupPubKey.fromX(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
+
+        // Optimalization
+        if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
+            aggregatedCoefs(publicShareListX, offset, pubKeyShareOffset, digestHelper);
+            coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
+            groupPubKey.multiplication(coefA);
+        }
 
         // Sum up the rest of the key shares
         for (short i = 1; i < numberOfParticipants; i++) {
-            pubKeyShareOffset += Constants.POINT_LEN;
-            aggregatedCoefs(publicShareList, pubKeyShareOffset, digestHelper);
-            coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
-            tmpPoint.setW(publicShareList, pubKeyShareOffset, Constants.POINT_LEN);
-            groupPubKey.multAndAdd(coefA, tmpPoint);
+            pubKeyShareOffset += Constants.XCORD_LEN;
+
+            // Optimalization
+            if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
+                aggregatedCoefs(publicShareListX, offset, pubKeyShareOffset, digestHelper);
+                coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
+                tmpPoint.fromX(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
+                groupPubKey.multAndAdd(coefA, tmpPoint);
+            } else {
+                groupPubKey.add(tmpPoint);
+            }
         }
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
 
-    private void aggregatedCoefs(byte[] publicShareList, short currentPubShareOffset, byte[] hashOutput) {
-        digest.update(publicShareList, (short) 0, (short) publicShareList.length);
-        digest.doFinal(publicShareList, currentPubShareOffset, Constants.SHARE_LEN, hashOutput, (short) 0);
+    /**
+     * Returns second key in the list (if not equal to the first one).
+     * Needed for computational speedup (BIP0327)
+     *
+     * @param publicShareListX List of x coordinates of public key shares
+     * @param keyListOffset Offset where public key shares begin
+     * @return Offset of the "second key"
+     */
+    private short getSecondKey (byte[] publicShareListX, short keyListOffset) {
+
+        short currentOffset = keyListOffset;
+
+        for (short i = 0; i < numberOfParticipants; i++) {
+            if (Util.arrayCompare(publicShareListX,
+                    currentOffset,
+                    publicShareListX,
+                    keyListOffset,
+                    Constants.XCORD_LEN) == (byte) 0x00) {
+                currentOffset += Constants.XCORD_LEN;
+            } else {
+                return currentOffset;
+            }
+        }
+
+        ISOException.throwIt(Constants.E_ALL_PUBKEYSHARES_SAME);
+        return (short) -1;
+    }
+
+    private byte isSecondKey (byte[] publicShareListX, short currentKeyOffset, short secondKeyOffset) {
+        return Util.arrayCompare(publicShareListX,
+                currentKeyOffset,
+                publicShareListX,
+                secondKeyOffset,
+                Constants.XCORD_LEN);
+    }
+
+    // TODO: Staci udelat hash XCORD nebo je potreba hash (X,Y)?
+    private void aggregatedCoefs(byte[] publicShareList,
+                                 short listOffset,
+                                 short currentPubShareOffset,
+                                 byte[] hashOutput) {
+
+        // Hash only the keys first
+        // TODO: Opravdu to musi byt tak slozite?
+        digest.doFinal(publicShareList,
+                listOffset,
+                (short) (publicShareList.length - listOffset),
+                hashOutput,
+                (short) 0);
+        digest.reset();
+
+        digest.update(hashOutput, (short) 0, Constants.HASH_LEN);
+        digest.doFinal(publicShareList, currentPubShareOffset, Constants.XCORD_LEN, hashOutput, (short) 0);
         digest.reset();
     }
 
@@ -236,6 +299,8 @@ public class Musig2 {
 
         writePartialSignatureOut(outBuffer, outOffset);
 
+        eraseNonce();
+
         stateReadyForSigning = Constants.STATE_FALSE;
 
         return (short) (Constants.POINT_LEN + Constants.SHARE_LEN);
@@ -328,12 +393,29 @@ public class Musig2 {
         digest.update(tmpArray, (short) 0, Constants.POINT_LEN);
     }
 
+    // Nonce must be erased after signing, otherwise the private key is revealed if used twice.
+    private void eraseNonce () {
+
+        Util.arrayFill(tmpArray, (short) 0, Constants.SHARE_LEN, (byte) 0x00);
+
+        for (short i = 0; i < Constants.V; i++) {
+            nonceOut[i].randomize();
+            nonceAggregate[i].randomize();
+            nonceState[i].fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
+        }
+    }
+
+    // Only returns X coordinate.
     public void getPublicKeyShare(byte[] buffer, short offset) {
         if ((short)(offset + Constants.POINT_LEN) > (short) buffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
-        publicShare.getW(buffer, offset);
+        short len = publicShare.getX(buffer, offset);
+
+        if (len != Constants.XCORD_LEN) {
+            ISOException.throwIt(Constants.E_WRONG_XCORD_LEN);
+        }
     }
 
     //In format v1, v2, v3, v4, ...
