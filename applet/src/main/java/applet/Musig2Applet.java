@@ -60,8 +60,6 @@ public class Musig2Applet extends Applet {
 
     private void combineKeyShares(APDU apdu) {
         //Tady bych normalne vzal ty shares z APDU
-        //TODO: Nejak pridat kartam ID, aby byl vysledek hashovani konzistentni.
-        // Nebo je jen nejak deterministicky seradit na klientovi.
 
         //musig2.combinePubKeyShares(apdu.getBuffer(), some offset here, some other offset here);
 
@@ -69,7 +67,7 @@ public class Musig2Applet extends Applet {
         short offset = (short) 0;
         for (short i = 0; i < Constants.MAX_PARTICIPATS - 1; i++) {
             otherCards[i].getPublicKeyShare(publicShareList, offset);
-            offset += Constants.POINT_LEN;
+            offset += Constants.XCORD_LEN;
         }
 
         musig2.getPublicKeyShare(publicShareList, offset);
@@ -106,7 +104,7 @@ public class Musig2Applet extends Applet {
         musig2.getPublicKeyShare(apduBuffer, ISO7816.OFFSET_CDATA);
 
         apdu.setOutgoing();
-        apdu.setOutgoingLength(Constants.POINT_LEN);
+        apdu.setOutgoingLength(Constants.XCORD_LEN);
     }
 
     private void getPublicNonceShare (APDU apdu) {
