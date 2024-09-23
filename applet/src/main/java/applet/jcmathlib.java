@@ -375,6 +375,21 @@ public class jcmathlib {
         }
 
         /**
+         * Checks whether this BigNat is a quadratic residue modulo p.
+         * @param p modulo
+         */
+        public boolean isQuadraticResidue(BigNat p) {
+            BigNat tmp = rm.BN_A;
+            BigNat exp = rm.BN_B;
+            tmp.clone(this);
+            exp.clone(p);
+            exp.decrement();
+            exp.shiftRight((short) 1);
+            tmp.modExp(exp, p);
+            return tmp.isOne();
+        }
+
+        /**
          * Computes square root of provided BigNat which MUST be prime using Tonelli Shanks Algorithm. The result (one of
          * the two roots) is stored to this.
          */
@@ -1447,10 +1462,10 @@ public class jcmathlib {
         public void multiplication(BigNat scalar) {
             if (OperationSupport.getInstance().EC_SW_DOUBLE && scalar.equals(ResourceManager.TWO)) {
                 swDouble();
-            // } else if (rm.ecMultKA.getAlgorithm() == KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY) {
+                // } else if (rm.ecMultKA.getAlgorithm() == KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY) {
             } else if (rm.ecMultKA.getAlgorithm() == (byte) 6) {
                 multXY(scalar);
-            //} else if (rm.ecMultKA.getAlgorithm() == KeyAgreement.ALG_EC_SVDP_DH_PLAIN) {
+                //} else if (rm.ecMultKA.getAlgorithm() == KeyAgreement.ALG_EC_SVDP_DH_PLAIN) {
             } else if (rm.ecMultKA.getAlgorithm() == (byte) 3) {
                 multX(scalar);
             } else {
@@ -1627,12 +1642,12 @@ public class jcmathlib {
          * @param xOffset offset in the byte array
          * @param xLen    length of the X coordinate
          */
-        public void fromX(byte[] xCoord, short xOffset, short xLen) {
+        public boolean fromX(byte[] xCoord, short xOffset, short xLen) {
             BigNat x = rm.EC_BN_F;
 
             x.setSize(xLen);
             x.fromByteArray(xCoord, xOffset, xLen);
-            fromX(x);
+            return fromX(x);
         }
 
         /**
@@ -1640,7 +1655,7 @@ public class jcmathlib {
          *
          * @param x the x coordinate
          */
-        private void fromX(BigNat x) {
+        private boolean fromX(BigNat x) {
             BigNat ySq = rm.EC_BN_C;
             BigNat y = rm.EC_BN_D;
             byte[] pointBuffer = rm.POINT_ARRAY_A;
@@ -1652,6 +1667,9 @@ public class jcmathlib {
             ySq.modMult(x, curve.pBN);
             ySq.modAdd(curve.bBN, curve.pBN);
             y.clone(ySq);
+            if (!y.isQuadraticResidue(curve.pBN)) {
+                return false;
+            }
             y.modSqrt(curve.pBN);
 
             // Construct public key with <x, y_1>
@@ -1659,6 +1677,7 @@ public class jcmathlib {
             x.prependZeros(curve.COORD_SIZE, pointBuffer, (short) 1);
             y.prependZeros(curve.COORD_SIZE, pointBuffer, (short) (1 + curve.COORD_SIZE));
             setW(pointBuffer, (short) 0, curve.POINT_SIZE);
+            return true;
         }
 
         /**
@@ -1868,7 +1887,7 @@ public class jcmathlib {
      * quick personalization and optimization of memory use when compiling for cards
      * with more/less available memory.
      *
-    * @author Petr Svenda
+     * @author Petr Svenda
      */
     public static class ObjectAllocator {
         short allocatedInRAM = 0;
@@ -2345,7 +2364,7 @@ public class jcmathlib {
 
     /**
      *
-    * @author Vasilios Mavroudis and Petr Svenda
+     * @author Vasilios Mavroudis and Petr Svenda
      */
     public static class ReturnCodes {
         // Custom error response codes

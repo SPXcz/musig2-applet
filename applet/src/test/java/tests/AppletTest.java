@@ -1,8 +1,7 @@
 package tests;
 
 import applet.Constants;
-import cardTools.CardType;
-import cardTools.RunConfig;
+import cz.muni.fi.crocs.rcard.client.CardType;
 import org.junit.Assert;
 import org.junit.jupiter.api.*;
 
@@ -33,6 +32,7 @@ public class AppletTest extends BaseTest {
         // setCardType(CardType.PHYSICAL);
         // setCardType(CardType.REMOTE);
         setCardType(CardType.JCARDSIMLOCAL);
+        setSimulateStateful(true);
     }
 
     @BeforeAll
