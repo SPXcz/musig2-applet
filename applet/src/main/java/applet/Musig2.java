@@ -4,12 +4,13 @@ import javacard.framework.*;
 import javacard.security.RandomData;
 import javacard.security.MessageDigest;
 import applet.jcmathlib.*;
-import org.omg.CORBA.PRIVATE_MEMBER;
+
+import javax.print.attribute.standard.MediaSize;
 
 public class Musig2 {
 
     // Helper
-    private MessageDigest digest;
+    private HashCustom digest;
     private RandomData rng;
 
     // Data storage
@@ -40,12 +41,14 @@ public class Musig2 {
     private BigNat modulo; // TODO: Je rBN spravny atribut?
     private BigNat[] nonceState;
     private short numberOfParticipants;
+    private short tacc; // BIP0327 coeficient
+    private short gacc; // BIP0327 coeficient
 
     public Musig2(ECCurve curve, ResourceManager rm) {
 
         // Helper objects
         digestHelper = JCSystem.makeTransientByteArray(Constants.HASH_LEN, JCSystem.CLEAR_ON_DESELECT);
-        digest = MessageDigest.getInstance(MessageDigest.ALG_SHA_256, false);
+        digest = new HashCustom();
         rng = RandomData.getInstance(RandomData.ALG_KEYGENERATION);
 
         // Helper attributes
@@ -123,9 +126,9 @@ public class Musig2 {
         short secondKeyOffset = getSecondKey(publicShareListX, offset);
 
         // Init first point in the sum
-        // TODO: Je XCORD format spravne? (1 + 32 B)
+        // TODO: Je XCORD format spravne? (1 + 32 B) - pouzit metodu encode/decode pro delku 33 bytes
         // TODO: fromX by melo hodit chybu, kdyz bod nejde sestrojit (podle BIP)
-        groupPubKey.fromX(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
+        groupPubKey.decode(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
 
         // Optimalization
         if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
@@ -142,12 +145,15 @@ public class Musig2 {
             if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
                 aggregatedCoefs(publicShareListX, offset, pubKeyShareOffset, digestHelper);
                 coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
-                tmpPoint.fromX(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
+                tmpPoint.decode(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
                 groupPubKey.multAndAdd(coefA, tmpPoint);
             } else {
                 groupPubKey.add(tmpPoint);
             }
         }
+
+        gacc = (short) 1;
+        tacc = (short) 0;
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
@@ -188,7 +194,7 @@ public class Musig2 {
                 Constants.XCORD_LEN);
     }
 
-    // TODO: Staci udelat hash XCORD nebo je potreba hash (X,Y)?
+    // TODO: Staci udelat hash XCORD nebo je potreba hash (X,Y)? Zatim ano, casem predelat.
     private void aggregatedCoefs(byte[] publicShareList,
                                  short listOffset,
                                  short currentPubShareOffset,
@@ -200,16 +206,21 @@ public class Musig2 {
                 listOffset,
                 (short) (publicShareList.length - listOffset),
                 hashOutput,
-                (short) 0);
-        digest.reset();
+                (short) 0,
+                HashCustom.NONCE_HASH_KEYS);
 
         digest.update(hashOutput, (short) 0, Constants.HASH_LEN);
-        digest.doFinal(publicShareList, currentPubShareOffset, Constants.XCORD_LEN, hashOutput, (short) 0);
-        digest.reset();
+        digest.doFinal(publicShareList,
+                currentPubShareOffset,
+                Constants.XCORD_LEN,
+                hashOutput,
+                (short) 0,
+                HashCustom.NONCE_KEYAGG_COEF);
     }
 
     // Single signature only
     // Nonce cant be reused
+    // TODO: Ramake to be BIP compatible
     public void generateNonces () {
 
         if (Constants.V != 2 && Constants.V != 4) {
@@ -217,7 +228,7 @@ public class Musig2 {
         }
 
         for (short i = 0; i < Constants.V; i++) {
-            getRandomBigNat(nonceState[i]);
+            generateSecNonce(nonceState[i]);
             nonceOut[i].setW(curve.G, (short) 0, (short) curve.G.length);
             nonceOut[i].multiplication(nonceState[i]);
         }
@@ -225,6 +236,23 @@ public class Musig2 {
         //TODO: Udelat state machine
         stateReadyForSigning = Constants.STATE_TRUE;
 
+    }
+
+    private void generateSecNonce (BigNat secNonce) {
+
+        BigNat rand = tmpBigNat;
+
+        getRandomBigNat(rand);
+        rand.copyToByteArray(digestHelper, (short) 0);
+        digest.update(digestHelper, (short) 0, Constants.SHARE_LEN);
+        digest.doFinal(new byte[]{(byte) Constants.POINT_LEN},
+                (short) 0x00,
+                (short) 1,
+                tmpArray,
+                (short) 0,
+                HashCustom.NONCE_NONCEGEN);
+
+        TADY DODELAT PODLE BIP
     }
 
     // Can be done off card
@@ -405,6 +433,25 @@ public class Musig2 {
         }
     }
 
+    // Always x-only tweak
+    //TODO: Do on client side
+    public void applyTweak (byte[] tweak, short offset, short length) {
+
+        BigNat g = tmpBigNat;
+
+        if (offset + length > Constants.HASH_LEN) {
+            ISOException.throwIt(Constants.E_TWEAK_TOO_LONG);
+        }
+
+        if (offset + length > (short) tweak.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
+
+        if (stateKeysEstablished == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+    }
+
     // Only returns X coordinate.
     public void getPublicKeyShare(byte[] buffer, short offset) {
         if ((short)(offset + Constants.POINT_LEN) > (short) buffer.length) {
@@ -436,5 +483,14 @@ public class Musig2 {
             nonceOut[i].getW(buffer, currentOffset);
             currentOffset += Constants.POINT_LEN;
         }
+    }
+
+    public void setGroupPubKey (byte[] groupPubKeyX, short offset) {
+
+        if ((short)(offset + Constants.XCORD_LEN) > (short) groupPubKeyX.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
+
+        this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
     }
 }

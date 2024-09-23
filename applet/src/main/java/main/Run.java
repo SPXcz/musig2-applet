@@ -14,7 +14,7 @@ public class Run {
         CardSimulator simulator = new CardSimulator();
 
         // 2. install applet
-        AID appletAID = AIDUtil.create("F000000001");
+        AID appletAID = AIDUtil.create("01ffff04050607081101");
         simulator.installApplet(appletAID, Musig2Applet.class);
 
         // 3. select applet
