@@ -39,7 +39,6 @@ public class Musig2Applet extends Applet {
         // Helper attributes
         rm = new ResourceManager(Constants.FULL_LEN);
         curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
-        rm.fixModSqMod(curve.rBN);
         musig2 = new Musig2(curve, rm);
         //publicShareList = JCSystem.makeTransientByteArray(Constants.MAX_PSHARE_LIST_LEN, JCSystem.CLEAR_ON_DESELECT);
 

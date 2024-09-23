@@ -144,7 +144,7 @@ javacard {
         cap {
             packageName 'applet'
             version '0.5'
-            aid '01:ff:ff:04:05:06:07:08:11'
+            aid '01:ff:ff:04:05:06:07'
             output 'applet.cap'
 
             dependencies {
@@ -163,7 +163,7 @@ javacard {
             //noinspection GroovyAssignabilityCheck
             applet {
                 className 'applet.Musig2Applet'
-                aid '01:ff:ff:04:05:06:07:08:11:01:02'
+                aid '01:ff:ff:04:05:06:07:08:11:01'
             }
         }
     }

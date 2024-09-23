@@ -39,6 +39,7 @@ public class Constants {
     public static final byte E_MESSAGE_TOO_LONG = (byte) 0x88;
     public static final byte E_WRONG_XCORD_LEN = (byte) 0x99;
     public static final byte E_ALL_PUBKEYSHARES_SAME = (byte) 0xAA;
+    public static final byte E_TWEAK_TOO_LONG = (byte) 0xBB;
 
     // Testing
 

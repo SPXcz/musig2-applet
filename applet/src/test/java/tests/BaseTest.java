@@ -1,10 +1,10 @@
 package tests;
 
 import applet.Musig2Applet;
-import cardTools.CardManager;
-import cardTools.CardType;
-import cardTools.RunConfig;
-import cardTools.Util;
+import cz.muni.fi.crocs.rcard.client.CardManager;
+import cz.muni.fi.crocs.rcard.client.CardType;
+import cz.muni.fi.crocs.rcard.client.RunConfig;
+import cz.muni.fi.crocs.rcard.client.Util;
 
 import javax.smartcardio.CardException;
 import javax.smartcardio.CommandAPDU;
@@ -18,7 +18,8 @@ import java.util.ArrayList;
  * @author Petr Svenda, Dusan Klinec (ph4r05)
  */
 public class BaseTest {
-    private static String APPLET_AID = "01ffff0405060708090102";
+    //private static String APPLET_AID = "6a6366726f7374617070";
+    private static String APPLET_AID = "01ffff04050607081101";
     private static byte APPLET_AID_BYTE[] = Util.hexStringToByteArray(APPLET_AID);
 
     protected CardType cardType = CardType.JCARDSIMLOCAL;
@@ -57,6 +58,9 @@ public class BaseTest {
         System.setProperty("com.licel.jcardsim.object_deletion_supported", "1");
         System.setProperty("com.licel.jcardsim.sign.dsasigner.computedhash", "1");
 
+        // Otherwise simulator requires modulus to be composite
+        System.setProperty("com.licel.jcardsim.bouncycastle.rsa.allow_unsafe_mod", "true");
+
         // Set to statically seed RandomData in the applet by "02", hexcoded
         // System.setProperty("com.licel.jcardsim.randomdata.seed", "02");
 
@@ -64,8 +68,8 @@ public class BaseTest {
         // System.setProperty("com.licel.jcardsim.randomdata.secure", "1");
 
         runCfg.setTestCardType(cardType);
+        runCfg.setTargetReaderIndex(2);
 
-        // Running on physical card
         if (cardType == CardType.REMOTE){
             runCfg.setRemoteAddress("http://127.0.0.1:9901");
 
