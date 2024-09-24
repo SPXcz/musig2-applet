@@ -2,10 +2,7 @@ package applet;
 
 import javacard.framework.*;
 import javacard.security.RandomData;
-import javacard.security.MessageDigest;
 import applet.jcmathlib.*;
-
-import javax.print.attribute.standard.MediaSize;
 
 public class Musig2 {
 
@@ -31,7 +28,7 @@ public class Musig2 {
     private ECPoint publicShare;
     private ECPoint groupPubKey;
     private ECPoint coefR; // Temporary attribute (clear after sig complete)
-    private ECPoint[] nonceOut;
+    private ECPoint[] pubNonce;
     private ECPoint[] nonceAggregate;
     private BigNat secretShare;
     private BigNat coefA;
@@ -39,7 +36,7 @@ public class Musig2 {
     private BigNat coefC; // Temporary attribute
     private BigNat partialSig;
     private BigNat modulo; // TODO: Je rBN spravny atribut?
-    private BigNat[] nonceState;
+    private BigNat[] secNonce;
     private short numberOfParticipants;
     private short tacc; // BIP0327 coeficient
     private short gacc; // BIP0327 coeficient
@@ -69,14 +66,14 @@ public class Musig2 {
         coefC = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        nonceOut = new ECPoint[Constants.V];
-        nonceState = new BigNat[Constants.V];
+        pubNonce = new ECPoint[Constants.V];
+        secNonce = new BigNat[Constants.V];
         nonceAggregate = new ECPoint[Constants.V];
 
         for (short i = (short) 0; i < Constants.V; i++) {
-            nonceOut[i] = new ECPoint(curve);
+            pubNonce[i] = new ECPoint(curve);
             nonceAggregate[i] = new ECPoint(curve);
-            nonceState[i] = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+            secNonce[i] = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         }
     }
 
@@ -106,7 +103,7 @@ public class Musig2 {
     // Can be done off card
     // Sorting offcard - lexicological order.
     // The last public share is the share of this card. Should be done correctly in the integrated version.
-    // TODO: Mam resit tweaks?
+    // TODO: Vysvetlit kodovani cbytes jak je definovano v BIP. Je takove kodovani reseno v JCMathlib?
     public void combinePubKeyShares (byte[] publicShareListX, short offset, short numberOfParticipants) {
 
         if (numberOfParticipants == 0) {
@@ -126,8 +123,6 @@ public class Musig2 {
         short secondKeyOffset = getSecondKey(publicShareListX, offset);
 
         // Init first point in the sum
-        // TODO: Je XCORD format spravne? (1 + 32 B) - pouzit metodu encode/decode pro delku 33 bytes
-        // TODO: fromX by melo hodit chybu, kdyz bod nejde sestrojit (podle BIP)
         groupPubKey.decode(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
 
         // Optimalization
@@ -228,9 +223,9 @@ public class Musig2 {
         }
 
         for (short i = 0; i < Constants.V; i++) {
-            generateSecNonce(nonceState[i]);
-            nonceOut[i].setW(curve.G, (short) 0, (short) curve.G.length);
-            nonceOut[i].multiplication(nonceState[i]);
+            generateSecNonce(secNonce[i], i);
+            pubNonce[i].setW(curve.G, (short) 0, (short) curve.G.length);
+            pubNonce[i].multiplication(secNonce[i]);
         }
 
         //TODO: Udelat state machine
@@ -238,21 +233,42 @@ public class Musig2 {
 
     }
 
-    private void generateSecNonce (BigNat secNonce) {
+    private void generateSecNonce (BigNat secNonce, short kIndex) {
 
         BigNat rand = tmpBigNat;
 
+        // Digest randomly generated data
         getRandomBigNat(rand);
         rand.copyToByteArray(digestHelper, (short) 0);
         digest.update(digestHelper, (short) 0, Constants.SHARE_LEN);
-        digest.doFinal(new byte[]{(byte) Constants.POINT_LEN},
+
+        // Digest public key share of the card
+        tmpArray[0] = Constants.XCORD_LEN;
+        publicShare.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
+        digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
+
+        // Digest group public key
+        tmpArray[0] = Constants.XCORD_LEN;
+        groupPubKey.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
+        digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
+
+        // Add rest of the arguments (most are currently not defined)
+        tmpArray[0] = (byte) 0x00; // m_prefixed
+        tmpArray[1] = (byte) 0x00; // 1-4 are length of extra_in
+        tmpArray[2] = (byte) 0x00;
+        tmpArray[3] = (byte) 0x00;
+        tmpArray[4] = (byte) 0x00;
+        tmpArray[5] = (byte) kIndex; // Index of the secret nonce. Either 0 or 1
+
+        digest.doFinal(tmpArray,
                 (short) 0x00,
-                (short) 1,
-                tmpArray,
+                (short) 6,
+                digestHelper,
                 (short) 0,
                 HashCustom.NONCE_NONCEGEN);
 
-        TADY DODELAT PODLE BIP
+        secNonce.fromByteArray(digestHelper, (short) 0, Constants.HASH_LEN);
+        secNonce.mod(modulo);
     }
 
     // Can be done off card
@@ -262,7 +278,7 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        short allNoncesLength = (short) (numberOfParticipants * Constants.POINT_LEN * Constants.V);
+        short allNoncesLength = (short) (numberOfParticipants * Constants.XCORD_LEN * Constants.V);
 
         if ((short)(buffer.length + offset) > allNoncesLength) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
@@ -273,8 +289,8 @@ public class Musig2 {
 
         // Init points
         for (short j = 0; j < Constants.V; j++) {
-            nonceAggregate[j].setW(buffer, currentOffset, Constants.POINT_LEN);
-            currentOffset += Constants.POINT_LEN;
+            nonceAggregate[j].decode(buffer, currentOffset, Constants.XCORD_LEN);
+            currentOffset += Constants.XCORD_LEN;
         }
 
         // Add the rest of the points
@@ -282,13 +298,13 @@ public class Musig2 {
             for (short k = (short) 0; k < Constants.V; k++) {
 
                 // Just to be sure. Should be redundant.
-                if ((short) (currentOffset + Constants.POINT_LEN) > (short) buffer.length) {
+                if ((short) (currentOffset + Constants.XCORD_LEN) > (short) buffer.length) {
                     ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
                 }
 
-                tmpPoint.setW(buffer, currentOffset, Constants.POINT_LEN);
+                tmpPoint.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 nonceAggregate[k].add(tmpPoint);
-                currentOffset += Constants.POINT_LEN;
+                currentOffset += Constants.XCORD_LEN;
             }
         }
 
@@ -315,7 +331,7 @@ public class Musig2 {
             return (short) -1;
         }
 
-        if ((short) (outOffset + Constants.POINT_LEN + Constants.SHARE_LEN) > (short) outBuffer.length) {
+        if ((short) (outOffset + Constants.XCORD_LEN + Constants.SHARE_LEN) > (short) outBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -402,10 +418,10 @@ public class Musig2 {
         partialSig.copy(coefC);
         partialSig.modMult(coefA, modulo); // TODO: Je modulo fixovane, kdyz jsem pouzil  rm.fixModSqMod(curve.rBN)?
         partialSig.modMult(secretShare, modulo);
-        partialSig.modAdd(nonceState[0], modulo);
+        partialSig.modAdd(secNonce[0], modulo);
 
         tmpBigNat.copy(coefB);
-        tmpBigNat.modMult(nonceState[1], modulo);
+        tmpBigNat.modMult(secNonce[1], modulo);
 
         partialSig.modAdd(tmpBigNat, modulo);
     }
@@ -427,9 +443,9 @@ public class Musig2 {
         Util.arrayFill(tmpArray, (short) 0, Constants.SHARE_LEN, (byte) 0x00);
 
         for (short i = 0; i < Constants.V; i++) {
-            nonceOut[i].randomize();
+            pubNonce[i].randomize();
             nonceAggregate[i].randomize();
-            nonceState[i].fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
+            secNonce[i].fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
         }
     }
 
@@ -473,15 +489,16 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        if ((short)(offset + Constants.POINT_LEN * Constants.V) > (short) buffer.length) {
+        if ((short)(offset + Constants.XCORD_LEN * Constants.V) > (short) buffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         short currentOffset = offset;
 
         for (short i = (short) 0; i < Constants.V; i++) {
-            nonceOut[i].getW(buffer, currentOffset);
-            currentOffset += Constants.POINT_LEN;
+            //TODO: Tady je true nebo false, aby to sedelo k cbytes v BIP?
+            pubNonce[i].encode(buffer, currentOffset, true);
+            currentOffset += Constants.XCORD_LEN;
         }
     }
 
