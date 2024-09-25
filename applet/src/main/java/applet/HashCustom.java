@@ -12,6 +12,7 @@ public class HashCustom {
     public static final byte[] NONCE_KEYAGG_COEF = {(byte) 0xAA, (byte) 0xBB, (byte) 0xBB};
     public static final byte[] NONCE_NONCEGEN = {(byte) 0x6B, (byte) 0xC6, (byte) 0xF4};
     public static final byte[] NONCE_NONCECOEF = {(byte) 0x0B, (byte) 0x74, (byte) 0xF1};
+    public static final byte[] NONCE_CHALLENGE = {(byte) 0x4B, (byte) 0xD6, (byte) 0x0A};
 
     private MessageDigest digest;
 
