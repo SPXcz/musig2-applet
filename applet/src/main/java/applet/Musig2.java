@@ -64,12 +64,12 @@ public class Musig2 {
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        coefG = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+        coefG = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+        challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        tacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        gacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        tacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+        gacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         pubNonce = new ECPoint[Constants.V];
         secNonce = new BigNat[Constants.V];
         nonceAggregate = new ECPoint[Constants.V];
@@ -113,119 +113,8 @@ public class Musig2 {
         outBigNat.fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
     }
 
-    // Can be done off card
-    // Sorting offcard - lexicological order.
-    // The last public share is the share of this card. Should be done correctly in the integrated version.
-    // TODO: Vysvetlit kodovani cbytes jak je definovano v BIP. Je takove kodovani reseno v JCMathlib?
-    public void combinePubKeyShares (byte[] publicShareListX, short offset, short numberOfParticipants) {
-
-        if (numberOfParticipants == 0) {
-            ISOException.throwIt(Constants.E_TOO_FEW_PARTICIPANTS);
-        }
-
-        if (numberOfParticipants > Constants.MAX_PARTICIPATS) {
-            ISOException.throwIt(Constants.E_TOO_MANY_PARTICIPANTS);
-        }
-
-        if ((short)(offset + numberOfParticipants * Constants.XCORD_LEN) > (short) publicShareListX.length) {
-            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
-        }
-
-        this.numberOfParticipants = numberOfParticipants;
-        short pubKeyShareOffset = offset;
-        short secondKeyOffset = getSecondKey(publicShareListX, offset);
-
-        // Init first point in the sum
-        groupPubKey.decode(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
-
-        // Optimalization
-        if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
-            aggregatedCoefs(publicShareListX, offset, pubKeyShareOffset, digestHelper);
-            coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
-            groupPubKey.multiplication(coefA);
-        }
-
-        // Sum up the rest of the key shares
-        for (short i = 1; i < numberOfParticipants; i++) {
-            pubKeyShareOffset += Constants.XCORD_LEN;
-
-            // Optimalization
-            if (isSecondKey(publicShareListX, pubKeyShareOffset, secondKeyOffset) != (byte) 0x00) {
-                aggregatedCoefs(publicShareListX, offset, pubKeyShareOffset, digestHelper);
-                coefA.fromByteArray(digestHelper, (short) 0, (short) digestHelper.length);
-                tmpPoint.decode(publicShareListX, pubKeyShareOffset, Constants.XCORD_LEN);
-                groupPubKey.multAndAdd(coefA, tmpPoint);
-            } else {
-                groupPubKey.add(tmpPoint);
-            }
-        }
-
-        stateKeysEstablished = Constants.STATE_TRUE;
-    }
-
-    /**
-     * Returns second key in the list (if not equal to the first one).
-     * Needed for computational speedup (BIP0327)
-     *
-     * @param publicShareListX List of x coordinates of public key shares
-     * @param keyListOffset Offset where public key shares begin
-     * @return Offset of the "second key"
-     */
-    private short getSecondKey (byte[] publicShareListX, short keyListOffset) {
-
-        short currentOffset = keyListOffset;
-
-        for (short i = 0; i < numberOfParticipants; i++) {
-            if (Util.arrayCompare(publicShareListX,
-                    currentOffset,
-                    publicShareListX,
-                    keyListOffset,
-                    Constants.XCORD_LEN) == (byte) 0x00) {
-                currentOffset += Constants.XCORD_LEN;
-            } else {
-                return currentOffset;
-            }
-        }
-
-        ISOException.throwIt(Constants.E_ALL_PUBKEYSHARES_SAME);
-        return (short) -1;
-    }
-
-    private byte isSecondKey (byte[] publicShareListX, short currentKeyOffset, short secondKeyOffset) {
-        return Util.arrayCompare(publicShareListX,
-                currentKeyOffset,
-                publicShareListX,
-                secondKeyOffset,
-                Constants.XCORD_LEN);
-    }
-
-    // TODO: Staci udelat hash XCORD nebo je potreba hash (X,Y)? Zatim ano, casem predelat.
-    private void aggregatedCoefs(byte[] publicShareList,
-                                 short listOffset,
-                                 short currentPubShareOffset,
-                                 byte[] hashOutput) {
-
-        // Hash only the keys first
-        // TODO: Opravdu to musi byt tak slozite?
-        digest.doFinal(publicShareList,
-                listOffset,
-                (short) (publicShareList.length - listOffset),
-                hashOutput,
-                (short) 0,
-                HashCustom.NONCE_HASH_KEYS);
-
-        digest.update(hashOutput, (short) 0, Constants.HASH_LEN);
-        digest.doFinal(publicShareList,
-                currentPubShareOffset,
-                Constants.XCORD_LEN,
-                hashOutput,
-                (short) 0,
-                HashCustom.NONCE_KEYAGG_COEF);
-    }
-
     // Single signature only
     // Nonce cant be reused
-    // TODO: Ramake to be BIP compatible
     public void generateNonces () {
 
         if (Constants.V != 2 && Constants.V != 4) {
@@ -281,46 +170,6 @@ public class Musig2 {
         secNonce.mod(modulo);
     }
 
-    // Can be done off card
-    public void aggregateNonces (byte[] buffer, short offset) {
-
-        if (stateReadyForSigning == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
-            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-        }
-
-        short allNoncesLength = (short) (numberOfParticipants * Constants.XCORD_LEN * Constants.V);
-
-        if ((short)(buffer.length + offset) > allNoncesLength) {
-            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
-            return;
-        }
-
-        short currentOffset = offset;
-
-        // Init points
-        for (short j = 0; j < Constants.V; j++) {
-            nonceAggregate[j].decode(buffer, currentOffset, Constants.XCORD_LEN);
-            currentOffset += Constants.XCORD_LEN;
-        }
-
-        // Add the rest of the points
-        for (short i = (short) 1; i < numberOfParticipants; i++) {
-            for (short k = (short) 0; k < Constants.V; k++) {
-
-                // Just to be sure. Should be redundant.
-                if ((short) (currentOffset + Constants.XCORD_LEN) > (short) buffer.length) {
-                    ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
-                }
-
-                tmpPoint.decode(buffer, currentOffset, Constants.XCORD_LEN);
-                nonceAggregate[k].add(tmpPoint);
-                currentOffset += Constants.XCORD_LEN;
-            }
-        }
-
-        stateNoncesAggregated = Constants.STATE_TRUE;
-    }
-
     public short sign (byte[] messageBuffer,
                       short inOffset,
                       short inLength,
@@ -329,6 +178,10 @@ public class Musig2 {
 
         if (stateReadyForSigning == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+
+        if (stateNoncesAggregated == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
         if (inLength > Constants.MAX_MESSAGE_LEN) {
@@ -357,7 +210,7 @@ public class Musig2 {
 
         stateReadyForSigning = Constants.STATE_FALSE;
 
-        return (short) (Constants.POINT_LEN + Constants.SHARE_LEN);
+        return modulo.length();
     }
 
     private void generateCoefB (byte[] messageBuffer, short offset, short length) {
@@ -436,7 +289,7 @@ public class Musig2 {
 
         partialSig.modAdd(tmpBigNat, modulo);
 
-        // TODO: Tady implementovat partialSigVerify
+        // TODO: Implementovat partialSigVerify na kleintovi
     }
 
     // Format: psig
@@ -474,29 +327,18 @@ public class Musig2 {
             nonceAggregate[i].randomize();
             secNonce[i].fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
         }
-    }
 
-    // Always x-only tweak
-    //TODO: Do on client side
-    public void applyTweak (byte[] tweak, short offset, short length) {
+        coefR.randomize();
 
-        BigNat g = tmpBigNat;
-
-        if (offset + length > Constants.HASH_LEN) {
-            ISOException.throwIt(Constants.E_TWEAK_TOO_LONG);
-        }
-
-        if (offset + length > (short) tweak.length) {
-            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
-        }
-
-        if (stateKeysEstablished == Constants.STATE_FALSE) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        }
     }
 
     // Only returns X coordinate.
     public void getPublicKeyShare(byte[] buffer, short offset) {
+
+        if (stateKeysEstablished == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
         if ((short)(offset + Constants.POINT_LEN) > (short) buffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
@@ -539,5 +381,20 @@ public class Musig2 {
         this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
         gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
         tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
+
+        stateKeysEstablished = Constants.STATE_TRUE;
+    }
+
+    // 33 + 33
+    public void setNonceAggregate (byte[] nonces, short offset) {
+
+        if ((short)(offset + 2 * Constants.XCORD_LEN) > (short) nonces.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
+
+        nonceAggregate[0].decode(nonces, offset, Constants.XCORD_LEN);
+        nonceAggregate[1].decode(nonces, (short) (offset + Constants.XCORD_LEN), Constants.XCORD_LEN);
+
+        stateNoncesAggregated = Constants.STATE_TRUE;
     }
 }
