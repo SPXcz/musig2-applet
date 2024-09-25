@@ -33,13 +33,14 @@ public class Musig2 {
     private BigNat secretShare;
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
-    private BigNat coefC; // Temporary attribute
+    private BigNat coefG;
+    private BigNat challangeE;
+    private BigNat tacc; // BIP0327 coeficient
+    private BigNat gacc; // BIP0327 coeficient
     private BigNat partialSig;
     private BigNat modulo; // TODO: Je rBN spravny atribut?
     private BigNat[] secNonce;
     private short numberOfParticipants;
-    private short tacc; // BIP0327 coeficient
-    private short gacc; // BIP0327 coeficient
 
     public Musig2(ECCurve curve, ResourceManager rm) {
 
@@ -63,9 +64,12 @@ public class Musig2 {
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        coefC = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        coefG = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        tacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        gacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         pubNonce = new ECPoint[Constants.V];
         secNonce = new BigNat[Constants.V];
         nonceAggregate = new ECPoint[Constants.V];
@@ -92,6 +96,15 @@ public class Musig2 {
         // Generate public key share
         publicShare.setW(curve.G, (short) 0, (short) curve.G.length);
         publicShare.multiplication(secretShare);
+
+        // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
+        coefG.copy(modulo);
+
+        if (publicShare.isYEven()) {
+            coefG.increment();
+        } else {
+            coefG.decrement();
+        }
     }
 
     // Only max. 32B (or the length of a secret key share)
@@ -146,9 +159,6 @@ public class Musig2 {
                 groupPubKey.add(tmpPoint);
             }
         }
-
-        gacc = (short) 1;
-        tacc = (short) 0;
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
@@ -338,8 +348,8 @@ public class Musig2 {
 
         generateCoefB(messageBuffer, inOffset, inLength);
         generateCoefR();
-        generateCoefC(messageBuffer, inOffset, inLength);
-        signPartially(messageBuffer, inOffset, inLength);
+        generateChallengeE(messageBuffer, inOffset, inLength);
+        signPartially();
 
         writePartialSignatureOut(outBuffer, outOffset);
 
@@ -357,18 +367,19 @@ public class Musig2 {
             return;
         }
 
-        // Hash public key
-        digestPoint(groupPubKey);
-
         // Hash public aggregated nonces
         for (short i = 0; i < Constants.V; i++) {
-            digestPoint(nonceAggregate[i]);
+            digestPoint(nonceAggregate[i], true);
         }
 
+        // Hash public key
+        // Must be encoded using xbytes
+        digestPoint(groupPubKey, false);
+
         // Hash the message to be signed
-        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0, HashCustom.NONCE_NONCECOEF);
         coefB.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
-        digest.reset();
+        coefB.mod(modulo);
     }
 
     private void generateCoefR () {
@@ -383,40 +394,40 @@ public class Musig2 {
 
         // Optimized operation for V = 2
         coefR.multAndAdd(coefB, nonceAggregate[1]);
-
-        // Only for V = 4
-        //TODO: Do for V = 4
-        for (short i = 2; i < Constants.V; i++) {
-            //2*b*R
-            //3*b*R
-        }
     }
 
-    // Similar to generateCoefB
-    private void generateCoefC (byte[] messageBuffer, short offset, short length) {
+    private void generateChallengeE (byte[] messageBuffer, short offset, short length) {
 
         if (stateNoncesAggregated == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             return;
         }
 
-        // Hash public key
-        digestPoint(groupPubKey);
+        digestPoint(coefR, false);
+        digestPoint(publicShare, false);
 
-        // Hash temporary R attribute
-        digestPoint(coefR);
-
-        // Hash the message
-        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
-        coefC.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
-        digest.reset();
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0, HashCustom.NONCE_CHALLENGE);
+        challangeE.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
+        challangeE.mod(modulo);
     }
 
     // Creates the partial signature itself
     // Currently only for V = 2
-    private void signPartially (byte[] messageBuffer, short offset, short length) {
-        partialSig.copy(coefC);
-        partialSig.modMult(coefA, modulo); // TODO: Je modulo fixovane, kdyz jsem pouzil  rm.fixModSqMod(curve.rBN)?
+    private void signPartially () {
+
+        // TODO: Asi jde optimalizovat
+        if (!coefR.isYEven()) {
+            for (short i = 0; i < Constants.V; i++) {
+                tmpBigNat.copy(modulo);
+                tmpBigNat.subtract(secNonce[i]);
+                secNonce[i].copy(tmpBigNat);
+            }
+        }
+
+        partialSig.copy(challangeE);
+        partialSig.modMult(coefA, modulo);
+        partialSig.modMult(coefG, modulo);
+        partialSig.modMult(gacc, modulo);
         partialSig.modMult(secretShare, modulo);
         partialSig.modAdd(secNonce[0], modulo);
 
@@ -424,17 +435,33 @@ public class Musig2 {
         tmpBigNat.modMult(secNonce[1], modulo);
 
         partialSig.modAdd(tmpBigNat, modulo);
+
+        // TODO: Tady implementovat partialSigVerify
     }
 
-    // Format: R + s
+    // Format: psig
     private void writePartialSignatureOut (byte[] outbuffer, short offset) {
-        coefR.getW(outbuffer, offset);
-        partialSig.copyToByteArray(outbuffer, (short) (offset + Constants.POINT_LEN));
+
+        if ((short) (offset + Constants.SHARE_LEN) > (short) outbuffer.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
+
+        partialSig.copyToByteArray(outbuffer, offset);
     }
 
-    private void digestPoint (ECPoint point) {
-        point.getW(tmpArray, (short) 0);
-        digest.update(tmpArray, (short) 0, Constants.POINT_LEN);
+    private void digestPoint (ECPoint point, boolean cbytes) {
+
+        short length;
+
+        if (cbytes) {
+            point.encode(tmpArray, (short) 0, true);  //TODO: True nebo false?
+            length = (short) 33;
+        } else {
+            point.getX(tmpArray, (short) 0);
+            length = (short) 32;
+        }
+
+        digest.update(tmpArray, (short) 0, length);
     }
 
     // Nonce must be erased after signing, otherwise the private key is revealed if used twice.
@@ -502,12 +529,15 @@ public class Musig2 {
         }
     }
 
+    // Public key, gacc, tacc (33+32+32)
     public void setGroupPubKey (byte[] groupPubKeyX, short offset) {
 
-        if ((short)(offset + Constants.XCORD_LEN) > (short) groupPubKeyX.length) {
+        if ((short)(offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN) > (short) groupPubKeyX.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
+        gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
+        tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
     }
 }
