@@ -88,6 +88,4 @@ public class AppletTest extends BaseTest {
         Assert.assertEquals(0x9000, responseAPDU.getSW());
         Assert.assertNotNull(responseAPDU.getBytes());
     }
-
-    UDELAT LEPSI TESTY
 }
