@@ -42,6 +42,7 @@ public class Constants {
     public static final byte E_WRONG_XCORD_LEN = (byte) 0x99;
     public static final byte E_ALL_PUBKEYSHARES_SAME = (byte) 0xAA;
     public static final byte E_TWEAK_TOO_LONG = (byte) 0xBB;
+    public static final byte E_HASHER_UNINITIALIZED = (byte) 0xCC;
 
     // Testing
 

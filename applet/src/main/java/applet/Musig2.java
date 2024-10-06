@@ -139,6 +139,7 @@ public class Musig2 {
         // Digest randomly generated data
         getRandomBigNat(rand);
         rand.copyToByteArray(digestHelper, (short) 0);
+        digest.init(HashCustom.MUSIG_NONCE);
         digest.update(digestHelper, (short) 0, Constants.SHARE_LEN);
 
         // Digest public key share of the card
@@ -163,8 +164,7 @@ public class Musig2 {
                 (short) 0x00,
                 (short) 6,
                 digestHelper,
-                (short) 0,
-                HashCustom.NONCE_NONCEGEN);
+                (short) 0);
 
         secNonce.fromByteArray(digestHelper, (short) 0, Constants.HASH_LEN);
         secNonce.mod(modulo);
@@ -220,6 +220,8 @@ public class Musig2 {
             return;
         }
 
+        digest.init(HashCustom.MUSIG_NONCECOEF);
+
         // Hash public aggregated nonces
         for (short i = 0; i < Constants.V; i++) {
             digestPoint(nonceAggregate[i], true);
@@ -230,7 +232,7 @@ public class Musig2 {
         digestPoint(groupPubKey, false);
 
         // Hash the message to be signed
-        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0, HashCustom.NONCE_NONCECOEF);
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
         coefB.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
         coefB.mod(modulo);
     }
@@ -256,10 +258,12 @@ public class Musig2 {
             return;
         }
 
+        digest.init(HashCustom.BIP_CHALLENGE);
+
         digestPoint(coefR, false);
         digestPoint(publicShare, false);
 
-        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0, HashCustom.NONCE_CHALLENGE);
+        digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
         challangeE.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
         challangeE.mod(modulo);
     }
@@ -371,16 +375,17 @@ public class Musig2 {
         }
     }
 
-    // Public key, gacc, tacc (33+32+32)
+    // Public key, gacc, tacc, coefA (33+32+32+32)
     public void setGroupPubKey (byte[] groupPubKeyX, short offset) {
 
-        if ((short)(offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN) > (short) groupPubKeyX.length) {
+        if ((short)(offset + Constants.XCORD_LEN + 3 * Constants.SHARE_LEN) > (short) groupPubKeyX.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
         gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
         tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
+        coefA.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
