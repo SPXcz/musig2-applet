@@ -81,7 +81,8 @@ public class Musig2 {
         }
     }
 
-    public void generateKeySharePair() {
+    // Key generation
+    public void individualPubkey() {
         if (curve == null
                 || publicShare == null
                 || secretShare == null
@@ -115,7 +116,7 @@ public class Musig2 {
 
     // Single signature only
     // Nonce cant be reused
-    public void generateNonces () {
+    public void nonceGen () {
 
         if (Constants.V != 2 && Constants.V != 4) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -147,10 +148,15 @@ public class Musig2 {
         publicShare.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
         digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
 
-        // Digest group public key
-        tmpArray[0] = Constants.XCORD_LEN;
-        groupPubKey.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
-        digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
+        // Digest group public key if it is already established
+        if (stateKeysEstablished == Constants.STATE_TRUE) {
+            tmpArray[0] = Constants.XCORD_LEN;
+            groupPubKey.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
+            digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
+        } else {
+            tmpArray[0] = (byte) 0x00;
+            digest.update(tmpArray, (short) 0, (short) 1);
+        }
 
         // Add rest of the arguments (most are currently not defined)
         tmpArray[0] = (byte) 0x00; // m_prefixed
@@ -184,6 +190,7 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
+        // TODO: Jak resit maximalni delku zpravy? (limitace JavaCard)
         if (inLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
@@ -336,8 +343,8 @@ public class Musig2 {
 
     }
 
-    // Only returns X coordinate.
-    public void getPublicKeyShare(byte[] buffer, short offset) {
+    // Bitcoin public key format
+    public void getXonlyPubKey(byte[] buffer, short offset) {
 
         if (stateKeysEstablished == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -401,5 +408,37 @@ public class Musig2 {
         nonceAggregate[1].decode(nonces, (short) (offset + Constants.XCORD_LEN), Constants.XCORD_LEN);
 
         stateNoncesAggregated = Constants.STATE_TRUE;
+    }
+
+    // sk + pk + aggpk (3 + 32 + 33 + 33)
+    public void setTestingValues (byte[] buffer, short offset) {
+
+            if (Constants.DEBUG == Constants.STATE_FALSE) {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+
+            short currentOffset = (short) (offset + 3);
+
+            if (Constants.DEBUG != Constants.STATE_TRUE) {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+
+            // Secret key
+            if (buffer[offset] == Constants.STATE_TRUE) {
+                secretShare.fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
+                currentOffset += Constants.SHARE_LEN;
+            }
+
+            // Public key
+            if (buffer[offset + 1] == Constants.STATE_TRUE) {
+                publicShare.decode(buffer, currentOffset, Constants.XCORD_LEN);
+                currentOffset += Constants.XCORD_LEN;
+            }
+
+            // Group public key
+            if (buffer[offset + 2] == Constants.STATE_TRUE) {
+                groupPubKey.decode(buffer, currentOffset, Constants.XCORD_LEN);
+                stateKeysEstablished = Constants.STATE_TRUE;
+            }
     }
 }

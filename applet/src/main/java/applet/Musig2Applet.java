@@ -17,7 +17,6 @@ public class Musig2Applet extends Applet {
     // Crypto args
     private ECCurve curve;
     private Musig2 musig2;
-    private Musig2[] otherCards;
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
         new Musig2Applet(bArray, bOffset, bLength);
@@ -40,35 +39,30 @@ public class Musig2Applet extends Applet {
         rm = new ResourceManager(Constants.FULL_LEN);
         curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
         musig2 = new Musig2(curve, rm);
-        //publicShareList = JCSystem.makeTransientByteArray(Constants.MAX_PSHARE_LIST_LEN, JCSystem.CLEAR_ON_DESELECT);
-
-        // Only for testing purposes
-        otherCards = new Musig2[Constants.MAX_PARTICIPATS - 1];
 
         initialized = true;
     }
 
     public void generateKeys () {
-        musig2.generateKeySharePair();
-        //for (short i = 0; i < Constants.MAX_PARTICIPATS - 1; i++) {
-        //    otherCards[i].generateKeySharePair();
-        //}
+        musig2.individualPubkey();
 
         ISOException.throwIt(ISO7816.SW_NO_ERROR);
     }
 
-    private void generateNonces() {
-        // For testing only
-        for (short i = (short) 0; i < (short) (Constants.MAX_PARTICIPATS - 1); i++) {
-            otherCards[i].generateNonces();
+    private void nonceGen (APDU apdu) {
+
+        byte[] apduBuffer = apdu.getBuffer();
+
+        if (Constants.DEBUG == Constants.STATE_TRUE) {
+            musig2.setTestingValues(apduBuffer, ISO7816.OFFSET_CDATA);
         }
 
-        musig2.generateNonces();
+        musig2.nonceGen();
     }
 
-    private void getPublicKeyShare (APDU apdu) {
+    private void getXonlyPubkey (APDU apdu) {
         byte[] apduBuffer = apdu.getBuffer();
-        musig2.getPublicKeyShare(apduBuffer, ISO7816.OFFSET_CDATA);
+        musig2.getXonlyPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
 
         apdu.setOutgoing();
         apdu.setOutgoingLength(Constants.XCORD_LEN);
@@ -92,7 +86,7 @@ public class Musig2Applet extends Applet {
         musig2.setNonceAggregate(apduBuffer, ISO7816.OFFSET_CDATA);
     }
 
-    private void sign(APDU apdu) {
+    private void sign (APDU apdu) {
         byte[] apduBuffer = apdu.getBuffer();
         short outLen = musig2.sign(apduBuffer,
                 ISO7816.OFFSET_CDATA,
@@ -132,13 +126,13 @@ public class Musig2Applet extends Applet {
                     generateKeys();
                     break;
                 case Constants.INS_GENERATE_NONCES:
-                    generateNonces();
+                    nonceGen(apdu);
                     break;
                 case Constants.INS_SIGN:
                     sign(apdu);
                     break;
                 case Constants.INS_GET_PKEY_SHARE:
-                    getPublicKeyShare(apdu);
+                    getXonlyPubkey(apdu);
                     break;
                 case Constants.INS_GET_PNONCE_SHARE:
                     getPublicNonceShare(apdu);
