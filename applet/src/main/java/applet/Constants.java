@@ -13,7 +13,7 @@ public class Constants {
     public static final short POINT_LEN = (short) 65;
     public static final short XCORD_LEN = (short) 33;
     public static final short MAX_PSHARE_LIST_LEN = (short) (MAX_PARTICIPATS * POINT_LEN);
-    public static final short MAX_MESSAGE_LEN = (short) 255;
+    public static final short MAX_MESSAGE_LEN = (short) 255; // Still only 16 bytes instead of 32 bytes as specified in BIP
 
     // Class
     public static final byte CLA_MUSIG2 = (byte) 0xA6;
@@ -45,5 +45,8 @@ public class Constants {
     public static final byte E_HASHER_UNINITIALIZED = (byte) 0xCC;
 
     // Testing
+    // IMPORTANT: Must be set to FALSE state in production
+    // Tests won't pass if set to FALSE
+    public static final byte DEBUG = Constants.STATE_TRUE;
 
 }
