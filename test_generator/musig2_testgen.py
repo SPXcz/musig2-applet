@@ -3,7 +3,7 @@ import sys
 
 from secp256r1 import secp256r1
 from fastecdsa.encoding.sec1 import SEC1Encoder
-from fastecdsa.point import Point
+from fastecdsa.point import PointO
 from functools import reduce
 
 from hashlib import sha256
@@ -13,7 +13,7 @@ V = 2
 
 # Od Tondy
 def encode(point: Point) -> bytes:
-    return SEC1Encoder.encode_public_key(point, compressed=False)
+    return SEC1Encoder.encode_public_key(point, compressed=True)
 
 # Od Tondy
 def as_java(b):
@@ -32,9 +32,9 @@ def pubkey_aggregate(keys : list[Point]) -> Point:
 
 def get_a(keys: list[Point], current_key: Point) -> int:
     sha256_hasher = sha256()
-    sha256_hasher.update(SEC1Encoder.encode_public_key(current_key, compressed=False))
+    sha256_hasher.update(SEC1Encoder.encode_public_key(current_key, compressed=True))
     for key in keys:
-        sha256_hasher.update(SEC1Encoder.encode_public_key(key, compressed=False))
+        sha256_hasher.update(SEC1Encoder.encode_public_key(key, compressed=True))
     return int.from_bytes(sha256_hasher.digest(), byteorder="big")
 
 def gen_nonce() -> tuple[list[Point], list[int]]:
@@ -51,9 +51,6 @@ def pubnonce_aggregate(nonces : list[list[Point]]) -> list[Point]:
     return agg_nonce
 
 def main():
-    print("================")
-    print("Musig2 Testing Data")
-    print("================")
 
     participant = {
         "public_key": None,

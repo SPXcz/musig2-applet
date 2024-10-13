@@ -43,8 +43,8 @@ public class Musig2Applet extends Applet {
         initialized = true;
     }
 
-    public void generateKeys () {
-        musig2.individualPubkey();
+    public void generateKeys (APDU apdu) {
+        musig2.individualPubkey(apdu.getBuffer(), ISO7816.OFFSET_CDATA);
 
         ISOException.throwIt(ISO7816.SW_NO_ERROR);
     }
@@ -65,7 +65,17 @@ public class Musig2Applet extends Applet {
         musig2.getXonlyPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
 
         apdu.setOutgoing();
+        apdu.setOutgoingLength((short) (Constants.XCORD_LEN - 1));
+        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, (short) (Constants.XCORD_LEN - 1));
+    }
+
+    private void getPlainPubkey (APDU apdu) {
+        byte[] apduBuffer = apdu.getBuffer();
+        musig2.getPlainPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
+
+        apdu.setOutgoing();
         apdu.setOutgoingLength(Constants.XCORD_LEN);
+        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, Constants.XCORD_LEN);
     }
 
     private void getPublicNonceShare (APDU apdu) {
@@ -74,6 +84,7 @@ public class Musig2Applet extends Applet {
 
         apdu.setOutgoing();
         apdu.setOutgoingLength((short) (Constants.POINT_LEN * Constants.V));
+        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, (short) (Constants.XCORD_LEN * Constants.V));
     }
 
     private void setAggPubKey (APDU apdu) {
@@ -123,7 +134,7 @@ public class Musig2Applet extends Applet {
         try {
             switch (apdu.getBuffer()[ISO7816.OFFSET_INS]) {
                 case Constants.INS_GENERATE_KEYS:
-                    generateKeys();
+                    generateKeys(apdu);
                     break;
                 case Constants.INS_GENERATE_NONCES:
                     nonceGen(apdu);
@@ -131,8 +142,11 @@ public class Musig2Applet extends Applet {
                 case Constants.INS_SIGN:
                     sign(apdu);
                     break;
-                case Constants.INS_GET_PKEY_SHARE:
+                case Constants.INS_GET_XONLY_PUBKEY:
                     getXonlyPubkey(apdu);
+                    break;
+                case Constants.INS_GET_PLAIN_PUBKEY:
+                    getPlainPubkey(apdu);
                     break;
                 case Constants.INS_GET_PNONCE_SHARE:
                     getPublicNonceShare(apdu);
