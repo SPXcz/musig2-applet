@@ -8,6 +8,9 @@ simulator/out
 tester/build
 tester/out
 
+test_generator/.venv
+test_generator/__pycache__
+
 *.class
 *.cap
 *~

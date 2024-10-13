@@ -17,9 +17,10 @@ public class Musig2 {
     private BigNat tmpBigNat;
 
     // States
-    private byte stateReadyForSigning;
-    private byte stateKeysEstablished;
-    private byte stateNoncesAggregated;
+    private byte stateKeyPairGenerated; // Set to TRUE if key share pair is generated
+    private byte stateReadyForSigning; // Controls whether nonce has been already used
+    private byte stateKeysEstablished; // Set to TRUE if group public key is set
+    private byte stateNoncesAggregated; // Set to TRUE if nonce is aggregated
 
     // Crypto arguments
     // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15)
@@ -54,6 +55,8 @@ public class Musig2 {
         tmpPoint = new ECPoint(curve);
         stateReadyForSigning = Constants.STATE_FALSE;
         stateNoncesAggregated = Constants.STATE_FALSE;
+        stateKeyPairGenerated = Constants.STATE_FALSE;
+        stateKeysEstablished = Constants.STATE_FALSE;
 
         // Main Attributes
         this.curve = curve;
@@ -77,12 +80,13 @@ public class Musig2 {
         for (short i = (short) 0; i < Constants.V; i++) {
             pubNonce[i] = new ECPoint(curve);
             nonceAggregate[i] = new ECPoint(curve);
-            secNonce[i] = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+            secNonce[i] = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         }
     }
 
     // Key generation
-    public void individualPubkey() {
+    public void individualPubkey(byte[] buffer, short offset) {
+
         if (curve == null
                 || publicShare == null
                 || secretShare == null
@@ -92,10 +96,18 @@ public class Musig2 {
         }
 
         // Generate private key share
-        getRandomBigNat(secretShare);
+        if (Constants.DEBUG == Constants.STATE_TRUE && buffer[offset] == Constants.STATE_TRUE) {
+            if (Constants.DEBUG != Constants.STATE_FALSE) {
+                setTestingValues(buffer, offset);
+            } else {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+        } else {
+            getRandomBigNat(secretShare);
+        }
 
         // Generate public key share
-        publicShare.setW(curve.G, (short) 0, (short) curve.G.length);
+        publicShare.decode(curve.G, (short) 0, (short) curve.G.length);
         publicShare.multiplication(secretShare);
 
         // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
@@ -106,6 +118,8 @@ public class Musig2 {
         } else {
             coefG.decrement();
         }
+
+        stateKeyPairGenerated = Constants.STATE_TRUE;
     }
 
     // Only max. 32B (or the length of a secret key share)
@@ -138,7 +152,16 @@ public class Musig2 {
         BigNat rand = tmpBigNat;
 
         // Digest randomly generated data
-        getRandomBigNat(rand);
+        if (Constants.DEBUG == Constants.STATE_TRUE) {
+            if (Constants.DEBUG != Constants.STATE_FALSE) {
+                rand.fromByteArray(Constants.RAND_TEST, (short) 0, Constants.SHARE_LEN);
+            } else {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+        } else {
+            getRandomBigNat(rand);
+        }
+
         rand.copyToByteArray(digestHelper, (short) 0);
         digest.init(HashCustom.MUSIG_NONCE);
         digest.update(digestHelper, (short) 0, Constants.SHARE_LEN);
@@ -346,15 +369,32 @@ public class Musig2 {
     // Bitcoin public key format
     public void getXonlyPubKey(byte[] buffer, short offset) {
 
-        if (stateKeysEstablished == Constants.STATE_FALSE) {
+        if (stateKeyPairGenerated == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
-        if ((short)(offset + Constants.POINT_LEN) > (short) buffer.length) {
+        if ((short)(offset + Constants.XCORD_LEN) > (short) buffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         short len = publicShare.getX(buffer, offset);
+
+        if (len != (Constants.XCORD_LEN - 1)) {
+            ISOException.throwIt(Constants.E_WRONG_XCORD_LEN);
+        }
+    }
+
+    public void getPlainPubKey (byte[] buffer, short offset) {
+
+        if (stateKeyPairGenerated == Constants.STATE_FALSE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
+        if ((short)(offset + Constants.XCORD_LEN) > (short) buffer.length) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
+
+        short len = publicShare.encode(buffer, offset, true);
 
         if (len != Constants.XCORD_LEN) {
             ISOException.throwIt(Constants.E_WRONG_XCORD_LEN);
@@ -376,7 +416,7 @@ public class Musig2 {
         short currentOffset = offset;
 
         for (short i = (short) 0; i < Constants.V; i++) {
-            //TODO: Tady je true nebo false, aby to sedelo k cbytes v BIP?
+            //Here's the place of the suspected bug
             pubNonce[i].encode(buffer, currentOffset, true);
             currentOffset += Constants.XCORD_LEN;
         }
@@ -433,6 +473,7 @@ public class Musig2 {
             if (buffer[offset + 1] == Constants.STATE_TRUE) {
                 publicShare.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
+                stateKeyPairGenerated = Constants.STATE_TRUE;
             }
 
             // Group public key

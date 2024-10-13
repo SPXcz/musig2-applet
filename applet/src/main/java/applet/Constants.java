@@ -21,7 +21,8 @@ public class Constants {
     // Instruction
     public static final byte INS_GENERATE_KEYS = (byte) 0xBB;
     public static final byte INS_COMBINE_SHARES = (byte) 0x4D;
-    public static final byte INS_GET_PKEY_SHARE = (byte) 0x70;
+    public static final byte INS_GET_XONLY_PUBKEY = (byte) 0x70;
+    public static final byte INS_GET_PLAIN_PUBKEY = (byte) 0x5A;
     public static final byte INS_SET_AGG_PUBKEY = (byte) 0x76;
     public static final byte INS_SET_AGG_NONCES = (byte) 0x9A;
     public static final byte INS_GET_PNONCE_SHARE = (byte) 0x35;
@@ -48,5 +49,6 @@ public class Constants {
     // IMPORTANT: Must be set to FALSE state in production
     // Tests won't pass if set to FALSE
     public static final byte DEBUG = Constants.STATE_TRUE;
+    public static final byte[] RAND_TEST = UtilMusig.hexStringToByteArray("0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F");
 
 }
