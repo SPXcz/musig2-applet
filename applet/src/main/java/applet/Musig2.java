@@ -205,6 +205,14 @@ public class Musig2 {
                       byte[] outBuffer,
                       short outOffset) {
 
+        if (Constants.DEBUG == Constants.STATE_TRUE) {
+            if (Constants.DEBUG != Constants.STATE_FALSE) {
+                inOffset += setTestingValues(messageBuffer, inOffset);
+            } else {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+        }
+
         if (stateReadyForSigning == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
@@ -451,13 +459,13 @@ public class Musig2 {
     }
 
     // sk + pk + aggpk (3 + 32 + 33 + 33)
-    public void setTestingValues (byte[] buffer, short offset) {
+    public short setTestingValues (byte[] buffer, short offset) {
 
             if (Constants.DEBUG == Constants.STATE_FALSE) {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
             }
 
-            short currentOffset = (short) (offset + 3);
+            short currentOffset = (short) (offset + 4);
 
             if (Constants.DEBUG != Constants.STATE_TRUE) {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
@@ -470,16 +478,28 @@ public class Musig2 {
             }
 
             // Public key
-            if (buffer[offset + 1] == Constants.STATE_TRUE) {
+            if (buffer[(short)(offset + 1)] == Constants.STATE_TRUE) {
                 publicShare.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
                 stateKeyPairGenerated = Constants.STATE_TRUE;
             }
 
             // Group public key
-            if (buffer[offset + 2] == Constants.STATE_TRUE) {
+            if (buffer[(short)(offset + 2)] == Constants.STATE_TRUE) {
                 groupPubKey.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 stateKeysEstablished = Constants.STATE_TRUE;
+                currentOffset += Constants.XCORD_LEN;
             }
+
+            // Aggregated nonce
+            if (buffer[(short)(offset + 3)] == Constants.STATE_TRUE) {
+                nonceAggregate[0].decode(buffer, currentOffset, Constants.XCORD_LEN);
+                currentOffset += Constants.XCORD_LEN;
+                nonceAggregate[1].decode(buffer, currentOffset, Constants.XCORD_LEN);
+                currentOffset += Constants.XCORD_LEN;
+                stateNoncesAggregated = Constants.STATE_TRUE;
+            }
+
+            return currentOffset;
     }
 }
