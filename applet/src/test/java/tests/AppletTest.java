@@ -148,13 +148,13 @@ public class AppletTest extends BaseTest {
         ResponseAPDU responseAPDU = connect().transmit(cmd);
 
         Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(0x9000, responseAPDU.getSW());
+        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
 
         CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
         ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
 
         Assert.assertNotNull(responseAPDU2);
-        Assert.assertEquals(0x9000, responseAPDU2.getSW());
+        Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
 
         byte[] pubNonce = responseAPDU2.getData();
 
