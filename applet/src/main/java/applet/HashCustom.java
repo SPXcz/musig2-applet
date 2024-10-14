@@ -21,10 +21,11 @@ public class HashCustom {
             (byte) 227, (byte) 132, (byte) 27, (byte) 71, (byte) 67, (byte) 159, (byte) 204, (byte) 88, (byte) 125, (byte) 32,
             (byte) 227, (byte) 193, (byte) 127, (byte) 8, (byte) 55};
 
-    public static byte[] MUSIG_NONCE = new byte[] {(byte) 248, (byte) 193, (byte) 12, (byte) 188, (byte) 97, (byte) 78, (byte) 209,
-            (byte) 160, (byte) 132, (byte) 180, (byte) 55, (byte) 5, (byte) 43, (byte) 93, (byte) 44, (byte) 75, (byte) 80, (byte) 26,
-            (byte) 157, (byte) 231, (byte) 170, (byte) 251, (byte) 227, (byte) 72, (byte) 172, (byte) 232, (byte) 2, (byte) 108, (byte) 167,
-            (byte) 252, (byte) 177, (byte) 123};
+    public static byte[] MUSIG_NONCE = new byte[] {(byte) 0xf8, (byte) 0xc1, (byte) 0xc, (byte) 0xbc, (byte) 0x61,
+            (byte) 0x4e, (byte) 0xd1, (byte) 0xa0, (byte) 0x84, (byte) 0xb4, (byte) 0x37, (byte) 0x5, (byte) 0x2b,
+            (byte) 0x5d, (byte) 0x2c, (byte) 0x4b, (byte) 0x50, (byte) 0x1a, (byte) 0x9d, (byte) 0xe7, (byte) 0xaa,
+            (byte) 0xfb, (byte) 0xe3, (byte) 0x48, (byte) 0xac, (byte) 0xe8, (byte) 0x2, (byte) 0x6c, (byte) 0xa7,
+            (byte) 0xfc, (byte) 0xb1, (byte) 0x7b};
 
     public static byte[] MUSIG_NONCECOEF = new byte[] {(byte) 90, (byte) 109, (byte) 69, (byte) 246, (byte) 218, (byte) 41,
             (byte) 230, (byte) 81, (byte) 203, (byte) 27, (byte) 162, (byte) 184, (byte) 172, (byte) 44, (byte) 221, (byte) 78,
@@ -55,6 +56,8 @@ public class HashCustom {
             digest.update(nonce, (short) 0x00, Constants.HASH_LEN);
             digest.update(nonce, (short) 0x00, Constants.HASH_LEN);
             firstDigest = false;
+        } else {
+            ISOException.throwIt(Constants.E_HASHER_UNINITIALIZED);
         }
     }
 
