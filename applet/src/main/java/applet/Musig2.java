@@ -51,7 +51,7 @@ public class Musig2 {
         rng = RandomData.getInstance(RandomData.ALG_KEYGENERATION);
 
         // Helper attributes
-        tmpArray = JCSystem.makeTransientByteArray(Constants.POINT_LEN, JCSystem.CLEAR_ON_DESELECT);
+        tmpArray = JCSystem.makeTransientByteArray((short) (Constants.POINT_LEN+1), JCSystem.CLEAR_ON_DESELECT);
         tmpPoint = new ECPoint(curve);
         stateReadyForSigning = Constants.STATE_FALSE;
         stateNoncesAggregated = Constants.STATE_FALSE;
@@ -168,14 +168,14 @@ public class Musig2 {
 
         // Digest public key share of the card
         tmpArray[0] = Constants.XCORD_LEN;
-        publicShare.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
+        publicShare.encode(tmpArray, (short) 1, true);
         digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
 
         // Digest group public key if it is already established
         if (stateKeysEstablished == Constants.STATE_TRUE) {
             tmpArray[0] = Constants.XCORD_LEN;
-            groupPubKey.decode(tmpArray, (short) 1, Constants.XCORD_LEN);
-            digest.update(tmpArray, (short) 0, (short) (Constants.XCORD_LEN + 1));
+            groupPubKey.getX(tmpArray, (short) 1);
+            digest.update(tmpArray, (short) 0, Constants.XCORD_LEN); // +1 for the length attribute and -1 for Xonly encoding
         } else {
             tmpArray[0] = (byte) 0x00;
             digest.update(tmpArray, (short) 0, (short) 1);
