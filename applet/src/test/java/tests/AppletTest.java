@@ -3,6 +3,8 @@ package tests;
 import applet.Constants;
 import applet.UtilMusig;
 import cz.muni.fi.crocs.rcard.client.CardType;
+import javacard.framework.ISO7816;
+import javacard.framework.Util;
 import org.junit.jupiter.api.*;
 import org.testng.Assert;
 
@@ -165,8 +167,23 @@ public class AppletTest extends BaseTest {
         data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_TRUE});
         data.put("privateKey", UtilMusig.hexStringToByteArray("7FB9E0E687ADA1EEBF7ECFE2F21E73EBDB51A7D450948DFE8D76D7F2D1007671"));
         data.put("aggnonce", UtilMusig.hexStringToByteArray("028465FCF0BBDBCF443AABCCE533D42B4B5A10966AC09A49655E8C42DAAB8FCD61037496A3CC86926D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"));
+        data.put("coefA", UtilMusig.hexStringToByteArray("7D6E3F4F742A6339631446AA2243F656FD1FE3FBE2693C745EC12DFE9AEAA084"));
+        data.put("tacc", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"));
+        //TODO: Where is MSB?
+        data.put("gacc", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000001"));
+        data.put("aggregatePublicKeyTest", UtilMusig.hexStringToByteArray("02ECF5759B1627A7E2CFFB9C55EB630454A187691596D46B80F6C7F5E35BABC831"));
         data.put("expectedSignature", UtilMusig.hexStringToByteArray("012ABBCB52B3016AC03AD82395A1A415C48B93DEF78718E62A7A90052FE224FB"));
         byte[] msg = UtilMusig.hexStringToByteArray("F95466D086770E689964664219266FE5ED215C92AE20BAB5C9D79ADDDDF3C0CF");
+
+        byte[] dataSetUpPubKey = concatenate(data.get("aggregatePublicKeyTest"), data.get("gacc"));
+        dataSetUpPubKey = concatenate(dataSetUpPubKey, data.get("tacc"));
+        dataSetUpPubKey = concatenate(dataSetUpPubKey, data.get("coefA"));
+
+        CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, dataSetUpPubKey);
+        ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
+
+        Assert.assertNotNull(responseAPDUSetUp);
+        Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
 
         byte[] dataBytes = concatenateDeter(data);
         dataBytes = concatenate(dataBytes, msg);
