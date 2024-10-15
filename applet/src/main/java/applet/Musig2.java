@@ -110,15 +110,6 @@ public class Musig2 {
         publicShare.decode(curve.G, (short) 0, (short) curve.G.length);
         publicShare.multiplication(secretShare);
 
-        // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
-        coefG.copy(modulo);
-
-        if (publicShare.isYEven()) {
-            coefG.increment();
-        } else {
-            coefG.decrement();
-        }
-
         stateKeyPairGenerated = Constants.STATE_TRUE;
     }
 
@@ -205,9 +196,11 @@ public class Musig2 {
                       byte[] outBuffer,
                       short outOffset) {
 
+        short msgOffset = inOffset;
+
         if (Constants.DEBUG == Constants.STATE_TRUE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
-                inOffset += setTestingValues(messageBuffer, inOffset);
+                msgOffset = setTestingValues(messageBuffer, inOffset);
             } else {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
             }
@@ -227,7 +220,7 @@ public class Musig2 {
             return (short) -1;
         }
 
-        if ((short) (inOffset + inLength) > (short) messageBuffer.length) {
+        if ((short) (msgOffset + inLength) > (short) messageBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -237,9 +230,9 @@ public class Musig2 {
             return (short) -1;
         }
 
-        generateCoefB(messageBuffer, inOffset, inLength);
+        generateCoefB(messageBuffer, msgOffset, inLength);
         generateCoefR();
-        generateChallengeE(messageBuffer, inOffset, inLength);
+        generateChallengeE(messageBuffer, msgOffset, inLength);
         signPartially();
 
         writePartialSignatureOut(outBuffer, outOffset);
@@ -362,8 +355,6 @@ public class Musig2 {
     // Nonce must be erased after signing, otherwise the private key is revealed if used twice.
     private void eraseNonce () {
 
-        Util.arrayFill(tmpArray, (short) 0, Constants.SHARE_LEN, (byte) 0x00);
-
         for (short i = 0; i < Constants.V; i++) {
             pubNonce[i].randomize();
             nonceAggregate[i].randomize();
@@ -442,6 +433,15 @@ public class Musig2 {
         tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
         coefA.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
 
+        // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
+        coefG.copy(modulo);
+
+        if (publicShare.isYEven()) {
+            coefG.increment();
+        } else {
+            coefG.decrement();
+        }
+
         stateKeysEstablished = Constants.STATE_TRUE;
     }
 
@@ -475,6 +475,7 @@ public class Musig2 {
             if (buffer[offset] == Constants.STATE_TRUE) {
                 secretShare.fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
                 currentOffset += Constants.SHARE_LEN;
+
             }
 
             // Public key
@@ -498,6 +499,7 @@ public class Musig2 {
                 nonceAggregate[1].decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
                 stateNoncesAggregated = Constants.STATE_TRUE;
+                stateReadyForSigning = Constants.STATE_TRUE;
             }
 
             return currentOffset;

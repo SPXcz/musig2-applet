@@ -99,14 +99,21 @@ public class Musig2Applet extends Applet {
 
     private void sign (APDU apdu) {
         byte[] apduBuffer = apdu.getBuffer();
+        short inLen = (short) (apduBuffer[ISO7816.OFFSET_LC] & 0xFF);
         short outLen = musig2.sign(apduBuffer,
                 ISO7816.OFFSET_CDATA,
-                apdu.getIncomingLength(),
+                inLen,
                 apduBuffer,
                 ISO7816.OFFSET_CDATA);
-
-        apdu.setOutgoing();
-        apdu.setOutgoingLength(outLen);
+        try {
+            apdu.setOutgoing();
+            apdu.setOutgoingLength(outLen);
+            apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, outLen);
+        } catch (CryptoException e) {
+            ISOException.throwIt(Constants.E_CRYPTO_EXCEPTION);
+        } catch (APDUException e) {
+            ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
+        }
     }
 
     public boolean select() {
