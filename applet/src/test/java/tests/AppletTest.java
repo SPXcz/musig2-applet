@@ -1,10 +1,7 @@
 package tests;
 
 import applet.Constants;
-import applet.UtilMusig;
 import cz.muni.fi.crocs.rcard.client.CardType;
-import javacard.framework.ISO7816;
-import javacard.framework.Util;
 import org.junit.jupiter.api.*;
 import org.testng.Assert;
 
@@ -135,7 +132,6 @@ public class AppletTest extends BaseTest {
     @Test
     public void testNonceGen1 () throws Exception {
 
-        //TODO: Go through hashing secret nonce in the BIP once again
         HashMap<String, byte[]> data = new HashMap<>();
         data.put("settings", new byte[] {Constants.STATE_FALSE, Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
         data.put("publicKey", UtilMusig.hexStringToByteArray("02F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"));
@@ -171,7 +167,6 @@ public class AppletTest extends BaseTest {
         data.put("secnonce2", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003935F972DA013F80AE011890FA89B67A27B7BE6CCB24D3274D18B2D4067F261A9"));
         data.put("coefA", UtilMusig.hexStringToByteArray("7D6E3F4F742A6339631446AA2243F656FD1FE3FBE2693C745EC12DFE9AEAA084"));
         data.put("tacc", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"));
-        //TODO: Where is MSB?
         data.put("gacc", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000001"));
         data.put("aggregatePublicKeyTest", UtilMusig.hexStringToByteArray("02ECF5759B1627A7E2CFFB9C55EB630454A187691596D46B80F6C7F5E35BABC831"));
         data.put("expectedSignature", UtilMusig.hexStringToByteArray("012ABBCB52B3016AC03AD82395A1A415C48B93DEF78718E62A7A90052FE224FB"));
