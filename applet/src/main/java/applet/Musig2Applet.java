@@ -163,6 +163,7 @@ public class Musig2Applet extends Applet {
                     break;
                 case Constants.INS_SET_AGG_NONCES:
                     setPublicNonce(apdu);
+                    break;
                 default:
                     ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
                     return;

@@ -49,6 +49,10 @@ public class Constants {
     // IMPORTANT: Must be set to FALSE state in production
     // Tests won't pass if set to FALSE
     public static final byte DEBUG = Constants.STATE_TRUE;
-    public static final byte[] RAND_TEST = UtilMusig.hexStringToByteArray("0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F");
+    //public static final byte[] RAND_TEST = UtilMusig.hexStringToByteArray("0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F");
+    public static byte[] RAND_TEST = new byte[] {(byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15,
+            (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15,
+            (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15,
+            (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15, (byte) 15};
 
 }
