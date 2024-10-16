@@ -72,7 +72,7 @@ public class AppletTest extends BaseTest {
     public void testKeygenValues1() throws Exception {
 
         HashMap<String, byte[]> data = new HashMap<>();
-        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
+        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
         data.put("privateKey", new byte[]{(byte) 0x2, (byte) 0x44, (byte) 0xef, (byte) 0xcd, (byte) 0x3c, (byte) 0xf2,
                 (byte) 0xba, (byte) 0x48, (byte) 0x54, (byte) 0x70, (byte) 0x1c, (byte) 0x5f, (byte) 0x52, (byte) 0x4d,
                 (byte) 0xc1, (byte) 0x48, (byte) 0x34, (byte) 0x9b, (byte) 0x4c, (byte) 0x45, (byte) 0x64, (byte) 0x23,
@@ -104,7 +104,7 @@ public class AppletTest extends BaseTest {
     public void testKeygenValues2() throws Exception {
 
         HashMap<String, byte[]> data = new HashMap<>();
-        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
+        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
         data.put("privateKey", new byte[]{(byte) 0x74, (byte) 0x4a, (byte) 0x32, (byte) 0x98, (byte) 0x65, (byte) 0x26,
                 (byte) 0x62, (byte) 0x58, (byte) 0xd, (byte) 0x19, (byte) 0x62, (byte) 0x92, (byte) 0x85, (byte) 0x3,
                 (byte) 0x32, (byte) 0x64, (byte) 0x1d, (byte) 0x6c, (byte) 0xa5, (byte) 0xe8, (byte) 0x1e, (byte) 0xaf,
@@ -137,7 +137,7 @@ public class AppletTest extends BaseTest {
 
         //TODO: Go through hashing secret nonce in the BIP once again
         HashMap<String, byte[]> data = new HashMap<>();
-        data.put("settings", new byte[] {Constants.STATE_FALSE, Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE});
+        data.put("settings", new byte[] {Constants.STATE_FALSE, Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
         data.put("publicKey", UtilMusig.hexStringToByteArray("02F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"));
         data.put("expectedSecNonce", UtilMusig.hexStringToByteArray("89BDD787D0284E5E4D5FC572E49E316BAB7E21E3B1830DE37DFE80156FA41A6D0B17AE8D024C53679699A6FD7944D9C4A366B514BAF43088E0708B1023DD289702F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"));
         data.put("expectedPubNonce", UtilMusig.hexStringToByteArray("02C96E7CB1E8AA5DAC64D872947914198F607D90ECDE5200DE52978AD5DED63C000299EC5117C2D29EDEE8A2092587C3909BE694D5CFF0667D6C02EA4059F7CD9786"));
@@ -164,9 +164,11 @@ public class AppletTest extends BaseTest {
     @Test
     public void testSign1 () throws Exception {
         HashMap<String, byte[]> data = new HashMap<>();
-        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_TRUE});
+        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_TRUE, Constants.STATE_TRUE});
         data.put("privateKey", UtilMusig.hexStringToByteArray("7FB9E0E687ADA1EEBF7ECFE2F21E73EBDB51A7D450948DFE8D76D7F2D1007671"));
         data.put("aggnonce", UtilMusig.hexStringToByteArray("028465FCF0BBDBCF443AABCCE533D42B4B5A10966AC09A49655E8C42DAAB8FCD61037496A3CC86926D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"));
+        data.put("secnonce", UtilMusig.hexStringToByteArray( "508B81A611F100A6B2B6B29656590898AF488BCF2E1F55CF22E5CFB84421FE61FA27FD49B1D50085B481285E1CA205D55C82CC1B31FF5CD54A489829355901F703935F972DA013F80AE011890FA89B67A27B7BE6CCB24D3274D18B2D4067F261A9"));
+        data.put("secnonce2", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003935F972DA013F80AE011890FA89B67A27B7BE6CCB24D3274D18B2D4067F261A9"));
         data.put("coefA", UtilMusig.hexStringToByteArray("7D6E3F4F742A6339631446AA2243F656FD1FE3FBE2693C745EC12DFE9AEAA084"));
         data.put("tacc", UtilMusig.hexStringToByteArray("0000000000000000000000000000000000000000000000000000000000000000"));
         //TODO: Where is MSB?
@@ -223,6 +225,10 @@ public class AppletTest extends BaseTest {
 
         if (data.get("settings")[3] == Constants.STATE_TRUE) {
             dataBytes = concatenate(dataBytes, data.get("aggnonce"));
+        }
+
+        if (data.get("settings")[4] == Constants.STATE_TRUE) {
+            dataBytes = concatenate(dataBytes, data.get("secnonce"));
         }
 
         return dataBytes;

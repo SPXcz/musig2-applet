@@ -197,10 +197,12 @@ public class Musig2 {
                       short outOffset) {
 
         short msgOffset = inOffset;
+        short msgLength = inLength;
 
         if (Constants.DEBUG == Constants.STATE_TRUE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
                 msgOffset = setTestingValues(messageBuffer, inOffset);
+                msgLength = (short) (inLength - (short) (msgOffset - inOffset));
             } else {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
             }
@@ -215,12 +217,12 @@ public class Musig2 {
         }
 
         // TODO: Jak resit maximalni delku zpravy? (limitace JavaCard)
-        if (inLength > Constants.MAX_MESSAGE_LEN) {
+        if (msgLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
         }
 
-        if ((short) (msgOffset + inLength) > (short) messageBuffer.length) {
+        if ((short) (msgOffset + msgLength) > (short) messageBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -230,9 +232,9 @@ public class Musig2 {
             return (short) -1;
         }
 
-        generateCoefB(messageBuffer, msgOffset, inLength);
+        generateCoefB(messageBuffer, msgOffset, msgLength);
         generateCoefR();
-        generateChallengeE(messageBuffer, msgOffset, inLength);
+        generateChallengeE(messageBuffer, msgOffset, msgLength);
         signPartially();
 
         writePartialSignatureOut(outBuffer, outOffset);
@@ -276,10 +278,10 @@ public class Musig2 {
         }
 
         // Initalize R using R1
-        coefR.copy(nonceAggregate[0]);
+        coefR.copy(nonceAggregate[1]);
 
         // Optimized operation for V = 2
-        coefR.multAndAdd(coefB, nonceAggregate[1]);
+        coefR.multAndAdd(coefB, nonceAggregate[0]);
     }
 
     private void generateChallengeE (byte[] messageBuffer, short offset, short length) {
@@ -292,7 +294,7 @@ public class Musig2 {
         digest.init(HashCustom.BIP_CHALLENGE);
 
         digestPoint(coefR, false);
-        digestPoint(publicShare, false);
+        digestPoint(groupPubKey, false);
 
         digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
         challangeE.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
@@ -428,6 +430,7 @@ public class Musig2 {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
+        // TODO: BigNat a ECPoint ukladaji short jako signed
         this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
         gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
         tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
@@ -465,7 +468,7 @@ public class Musig2 {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
             }
 
-            short currentOffset = (short) (offset + 4);
+            short currentOffset = (short) (offset + 5);
 
             if (Constants.DEBUG != Constants.STATE_TRUE) {
                 ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
@@ -500,6 +503,15 @@ public class Musig2 {
                 currentOffset += Constants.XCORD_LEN;
                 stateNoncesAggregated = Constants.STATE_TRUE;
                 stateReadyForSigning = Constants.STATE_TRUE;
+            }
+
+            // Secnonce
+            if (buffer[(short)(offset + 4)] == Constants.STATE_TRUE) {
+                secNonce[0].fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
+                currentOffset += Constants.SHARE_LEN;
+                secNonce[1].fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
+                currentOffset += Constants.SHARE_LEN;
+                currentOffset += Constants.XCORD_LEN; // Also includes PK for some reason
             }
 
             return currentOffset;
