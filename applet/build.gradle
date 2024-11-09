@@ -143,7 +143,7 @@ javacard {
         //noinspection GroovyAssignabilityCheck
         cap {
             packageName 'applet'
-            version '0.5'
+            version '0.1'
             aid '01:ff:ff:04:05:06:07'
             output 'applet.cap'
 
@@ -151,7 +151,7 @@ javacard {
                 remote 'com.klinec:jcardsim:3.0.5.11'
             }
 
-            // JC310b43 supports compilation targeting for lower API versions.
+            // JC310b43 supports cfor lower ompilation targeting API versions.
             // Here you can specify path to the SDK you want to use.
             // Only JC304 and higher are supported for targeting.
             // If JC310b43 is not used, targetsdk cannot be set.
