@@ -5,14 +5,11 @@ import applet.jcmathlib.*;
 import applet.jcmathlib.SecP256k1;
 import javacard.security.CryptoException;
 
-public class Musig2Applet extends Applet {
-
-    public final static short CARD_TYPE = OperationSupport.SIMULATOR;
+public class Musig2Applet extends Applet implements AppletEvent {
 
     // Utils
     private boolean initialized = false;
     private ResourceManager rm;
-    private byte[] publicShareList;
 
     // Crypto args
     private ECCurve curve;
@@ -23,7 +20,7 @@ public class Musig2Applet extends Applet {
     }
 
     public Musig2Applet(byte[] bArray, short bOffset, byte bLength) {
-        OperationSupport.getInstance().setCard(CARD_TYPE);
+        OperationSupport.getInstance().setCard(Constants.CARD_TYPE);
         if(!OperationSupport.getInstance().DEFERRED_INITIALIZATION) {
             initialize();
         }
@@ -35,12 +32,38 @@ public class Musig2Applet extends Applet {
             return;
         }
 
-        // Helper attributes
-        rm = new ResourceManager(Constants.FULL_LEN);
-        curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
-        musig2 = new Musig2(curve, rm);
+        try {
+            rm = new ResourceManager(Constants.FULL_LEN);
+            curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
+            musig2 = new Musig2(curve, rm);
 
-        initialized = true;
+            initialized = true;
+        // Error handling is taken from JCFROST
+        } catch (ISOException e) {
+            throw e; // Our exception from code, just re-emit
+        } catch (ArrayIndexOutOfBoundsException e) {
+            ISOException.throwIt(Constants.SW_ArrayIndexOutOfBoundsException);
+        } catch (ArithmeticException e) {
+            ISOException.throwIt(Constants.SW_ArithmeticException);
+        } catch (ArrayStoreException e) {
+            ISOException.throwIt(Constants.SW_ArrayStoreException);
+        } catch (NullPointerException e) {
+            ISOException.throwIt(Constants.SW_NullPointerException);
+        } catch (NegativeArraySizeException e) {
+            ISOException.throwIt(Constants.SW_NegativeArraySizeException);
+        } catch (CryptoException e) {
+            ISOException.throwIt((short) (Constants.SW_CryptoException_prefix | e.getReason()));
+        } catch (SystemException e) {
+            ISOException.throwIt((short) (Constants.SW_SystemException_prefix | e.getReason()));
+        } catch (PINException e) {
+            ISOException.throwIt((short) (Constants.SW_PINException_prefix | e.getReason()));
+        } catch (TransactionException e) {
+            ISOException.throwIt((short) (Constants.SW_TransactionException_prefix | e.getReason()));
+        } catch (CardRuntimeException e) {
+            ISOException.throwIt((short) (Constants.SW_CardRuntimeException_prefix | e.getReason()));
+        } catch (Exception e) {
+            ISOException.throwIt(Constants.SW_Exception);
+        }
     }
 
     public void generateKeys (APDU apdu) {
@@ -116,6 +139,11 @@ public class Musig2Applet extends Applet {
         }
     }
 
+    private void reset(APDU apdu) {
+        musig2.reset();
+        apdu.setOutgoing();
+    }
+
     public boolean select() {
         if(initialized) {
             curve.updateAfterReset();
@@ -164,13 +192,47 @@ public class Musig2Applet extends Applet {
                 case Constants.INS_SET_AGG_NONCES:
                     setPublicNonce(apdu);
                     break;
+                case Constants.INS_RESET:
+                    reset(apdu);
+                    break;
                 default:
                     ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
                     return;
             }
+        // Error handling is taken from JCFROST
+        } catch (ISOException e) {
+            throw e; // Our exception from code, just re-emit
+        } catch (ArrayIndexOutOfBoundsException e) {
+            ISOException.throwIt(Constants.SW_ArrayIndexOutOfBoundsException);
+        } catch (ArithmeticException e) {
+            ISOException.throwIt(Constants.SW_ArithmeticException);
+        } catch (ArrayStoreException e) {
+            ISOException.throwIt(Constants.SW_ArrayStoreException);
+        } catch (NullPointerException e) {
+            ISOException.throwIt(Constants.SW_NullPointerException);
+        } catch (NegativeArraySizeException e) {
+            ISOException.throwIt(Constants.SW_NegativeArraySizeException);
         } catch (CryptoException e) {
-            ISOException.throwIt(Constants.E_CRYPTO_EXCEPTION);
+            ISOException.throwIt((short) (Constants.SW_CryptoException_prefix | e.getReason()));
+        } catch (SystemException e) {
+            ISOException.throwIt((short) (Constants.SW_SystemException_prefix | e.getReason()));
+        } catch (PINException e) {
+            ISOException.throwIt((short) (Constants.SW_PINException_prefix | e.getReason()));
+        } catch (TransactionException e) {
+            ISOException.throwIt((short) (Constants.SW_TransactionException_prefix | e.getReason()));
+        } catch (CardRuntimeException e) {
+            ISOException.throwIt((short) (Constants.SW_CardRuntimeException_prefix | e.getReason()));
+        } catch (Exception e) {
+            ISOException.throwIt(Constants.SW_Exception);
         }
+    }
 
+    @Override
+    public void uninstall() {
+        musig2.dereference();
+        musig2 = null;
+        initialized = false;
+        curve = null;
+        rm = null;
     }
 }

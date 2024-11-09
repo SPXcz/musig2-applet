@@ -1751,11 +1751,14 @@ public class jcmathlib {
 
                 //Y^2 = X^3 + XA + B = x(x^2+A)+B
                 y.clone(x);
-                y.modSq(curve.pBN);
+                y.modSq(curve.pBN);  // TODO: TADY 0xf101
                 y.modAdd(curve.aBN, curve.pBN);
+
                 y.modMult(x, curve.pBN);
                 y.modAdd(curve.bBN, curve.pBN);
                 y.modSqrt(curve.pBN);
+
+                // B
 
                 pointBuffer[0] = 0x04;
                 x.prependZeros(curve.COORD_SIZE, pointBuffer, (short) 1);
@@ -2064,7 +2067,7 @@ public class jcmathlib {
         public static final short SECORA = 0x0006;      // Infineon Secora ID S
 
         public short MIN_RSA_BIT_LENGTH = 512;
-        public boolean DEFERRED_INITIALIZATION = false;
+        public boolean DEFERRED_INITIALIZATION = false; // Change to false if the card isn't JCOP3 or JCOP4
 
         public boolean RSA_EXP = true;
         public boolean RSA_SQ = true;
