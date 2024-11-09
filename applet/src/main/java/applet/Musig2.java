@@ -13,7 +13,6 @@ public class Musig2 {
     // Data storage
     private byte[] digestHelper;
     private byte[] tmpArray;
-    private ECPoint tmpPoint;
     private BigNat tmpBigNat;
 
     // States
@@ -30,7 +29,7 @@ public class Musig2 {
     private ECPoint groupPubKey;
     private ECPoint coefR; // Temporary attribute (clear after sig complete)
     private ECPoint[] pubNonce;
-    private ECPoint[] nonceAggregate;
+    private ECPoint[] aggNonce;
     private BigNat secretShare;
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
@@ -41,7 +40,6 @@ public class Musig2 {
     private BigNat partialSig;
     private BigNat modulo; // TODO: Je rBN spravny atribut?
     private BigNat[] secNonce;
-    private short numberOfParticipants;
 
     public Musig2(ECCurve curve, ResourceManager rm) {
 
@@ -52,7 +50,6 @@ public class Musig2 {
 
         // Helper attributes
         tmpArray = JCSystem.makeTransientByteArray((short) (Constants.POINT_LEN+1), JCSystem.CLEAR_ON_DESELECT);
-        tmpPoint = new ECPoint(curve);
         stateReadyForSigning = Constants.STATE_FALSE;
         stateNoncesAggregated = Constants.STATE_FALSE;
         stateKeyPairGenerated = Constants.STATE_FALSE;
@@ -62,24 +59,28 @@ public class Musig2 {
         this.curve = curve;
         modulo = this.curve.rBN;
         groupPubKey = new ECPoint(curve);
-        publicShare = new ECPoint(curve);
+        publicShare = new ECPoint(curve); // TODO: Tady hodi chybu (TransactException + BUFFER_FULL commit buffer)
+
         coefR = new ECPoint(curve);
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
+
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         coefG = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
         tacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         gacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
+
         pubNonce = new ECPoint[Constants.V];
         secNonce = new BigNat[Constants.V];
-        nonceAggregate = new ECPoint[Constants.V];
+        aggNonce = new ECPoint[Constants.V];
 
         for (short i = (short) 0; i < Constants.V; i++) {
             pubNonce[i] = new ECPoint(curve);
-            nonceAggregate[i] = new ECPoint(curve);
+            aggNonce[i] = new ECPoint(curve);
             secNonce[i] = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         }
     }
@@ -257,7 +258,7 @@ public class Musig2 {
 
         // Hash public aggregated nonces
         for (short i = 0; i < Constants.V; i++) {
-            digestPoint(nonceAggregate[i], true);
+            digestPoint(aggNonce[i], true);
         }
 
         // Hash public key
@@ -278,10 +279,10 @@ public class Musig2 {
         }
 
         // Initalize R using R1
-        coefR.copy(nonceAggregate[1]);
+        coefR.copy(aggNonce[1]);
 
         // Optimized operation for V = 2
-        coefR.multAndAdd(coefB, nonceAggregate[0]);
+        coefR.multAndAdd(coefB, aggNonce[0]);
     }
 
     private void generateChallengeE (byte[] messageBuffer, short offset, short length) {
@@ -359,10 +360,12 @@ public class Musig2 {
 
         for (short i = 0; i < Constants.V; i++) {
             pubNonce[i].randomize();
-            nonceAggregate[i].randomize();
-            secNonce[i].fromByteArray(tmpArray, (short) 0, Constants.SHARE_LEN);
+            aggNonce[i].randomize();
+            secNonce[i].erase();
         }
 
+        challangeE.erase();
+        coefB.erase();
         coefR.randomize();
 
     }
@@ -430,7 +433,6 @@ public class Musig2 {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
-        // TODO: BigNat a ECPoint ukladaji short jako signed
         this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
         gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
         tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
@@ -439,11 +441,14 @@ public class Musig2 {
         // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
         coefG.copy(modulo);
 
-        if (publicShare.isYEven()) {
+        // TODO: Part of tweaking in the future
+        if (this.groupPubKey.isYEven()) {
             coefG.increment();
         } else {
             coefG.decrement();
         }
+
+        coefG.mod(modulo);
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
@@ -455,8 +460,8 @@ public class Musig2 {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
-        nonceAggregate[0].decode(nonces, offset, Constants.XCORD_LEN);
-        nonceAggregate[1].decode(nonces, (short) (offset + Constants.XCORD_LEN), Constants.XCORD_LEN);
+        aggNonce[0].decode(nonces, offset, Constants.XCORD_LEN);
+        aggNonce[1].decode(nonces, (short) (offset + Constants.XCORD_LEN), Constants.XCORD_LEN);
 
         stateNoncesAggregated = Constants.STATE_TRUE;
     }
@@ -478,7 +483,6 @@ public class Musig2 {
             if (buffer[offset] == Constants.STATE_TRUE) {
                 secretShare.fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
                 currentOffset += Constants.SHARE_LEN;
-
             }
 
             // Public key
@@ -497,9 +501,9 @@ public class Musig2 {
 
             // Aggregated nonce
             if (buffer[(short)(offset + 3)] == Constants.STATE_TRUE) {
-                nonceAggregate[0].decode(buffer, currentOffset, Constants.XCORD_LEN);
+                aggNonce[0].decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
-                nonceAggregate[1].decode(buffer, currentOffset, Constants.XCORD_LEN);
+                aggNonce[1].decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
                 stateNoncesAggregated = Constants.STATE_TRUE;
                 stateReadyForSigning = Constants.STATE_TRUE;
@@ -515,5 +519,43 @@ public class Musig2 {
             }
 
             return currentOffset;
+    }
+
+    public void reset () {
+        stateKeyPairGenerated = Constants.STATE_FALSE;
+        stateReadyForSigning = Constants.STATE_FALSE;
+        stateKeysEstablished = Constants.STATE_FALSE;
+        stateNoncesAggregated = Constants.STATE_FALSE;
+    }
+
+    public void dereference() {
+        digest = null;
+        rng = null;
+        digestHelper = null;
+        tmpArray = null;
+        tmpBigNat = null;
+        curve = null;
+        publicShare = null;
+        groupPubKey = null;
+        coefR = null;
+
+        for (short i = 0; i < Constants.V; i++) {
+            aggNonce[i] = null;
+            secNonce[i] = null;
+            pubNonce[i] = null;
+        }
+
+        pubNonce = null;
+        aggNonce = null;
+        secretShare = null;
+        coefA = null;
+        coefB = null;
+        coefG = null;
+        challangeE = null;
+        tacc = null;
+        gacc = null;
+        partialSig = null;
+        modulo = null;
+        secNonce = null;
     }
 }
