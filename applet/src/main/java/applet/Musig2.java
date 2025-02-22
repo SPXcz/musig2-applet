@@ -1,6 +1,7 @@
 package applet;
 
 import javacard.framework.*;
+import javacard.security.CryptoException;
 import javacard.security.RandomData;
 import applet.jcmathlib.*;
 
@@ -38,7 +39,7 @@ public class Musig2 {
     private BigNat tacc; // BIP0327 coeficient
     private BigNat gacc; // BIP0327 coeficient
     private BigNat partialSig;
-    private BigNat modulo; // TODO: Je rBN spravny atribut?
+    private BigNat modulo;
     private BigNat[] secNonce;
 
     public Musig2(ECCurve curve, ResourceManager rm) {
@@ -59,7 +60,7 @@ public class Musig2 {
         this.curve = curve;
         modulo = this.curve.rBN;
         groupPubKey = new ECPoint(curve);
-        publicShare = new ECPoint(curve); // TODO: Tady hodi chybu (TransactException + BUFFER_FULL commit buffer)
+        publicShare = new ECPoint(curve);
 
         coefR = new ECPoint(curve);
         secretShare = new BigNat(Constants.SHARE_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm); // Effective private key
@@ -200,7 +201,9 @@ public class Musig2 {
         short msgOffset = inOffset;
         short msgLength = inLength;
 
-        if (Constants.DEBUG == Constants.STATE_TRUE) {
+        if (Constants.DEBUG == Constants.STATE_TRUE
+                && messageBuffer[inOffset] == Constants.STATE_TRUE
+                && messageBuffer[(short) (inOffset + 1)] == Constants.STATE_FALSE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
                 msgOffset = setTestingValues(messageBuffer, inOffset);
                 msgLength = (short) (inLength - (short) (msgOffset - inOffset));
@@ -427,16 +430,16 @@ public class Musig2 {
     }
 
     // Public key, gacc, tacc, coefA (33+32+32+32)
-    public void setGroupPubKey (byte[] groupPubKeyX, short offset) {
+    public void setGroupPubKey (byte[] firstRoundData, short offset) {
 
-        if ((short)(offset + Constants.XCORD_LEN + 3 * Constants.SHARE_LEN) > (short) groupPubKeyX.length) {
+        if ((short)(offset + Constants.XCORD_LEN + 3 * Constants.SHARE_LEN) > (short) firstRoundData.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
-        this.groupPubKey.decode(groupPubKeyX, offset, Constants.XCORD_LEN);
-        gacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
-        tacc.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
-        coefA.fromByteArray(groupPubKeyX, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
+        this.groupPubKey.decode(firstRoundData, offset, Constants.XCORD_LEN);
+        gacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
+        tacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
+        coefA.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
 
         // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
         coefG.copy(modulo);
@@ -466,7 +469,7 @@ public class Musig2 {
         stateNoncesAggregated = Constants.STATE_TRUE;
     }
 
-    // sk + pk + aggpk (3 + 32 + 33 + 33)
+    // sk + pk + aggpk (5 + 32 + 33 + 33 + 66 + 64)
     public short setTestingValues (byte[] buffer, short offset) {
 
             if (Constants.DEBUG == Constants.STATE_FALSE) {
