@@ -34,7 +34,6 @@ public class Musig2 {
     private BigNat secretShare;
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
-    private BigNat coefG;
     private BigNat challangeE;
     private BigNat tacc; // BIP0327 coeficient
     private BigNat gacc; // BIP0327 coeficient
@@ -67,7 +66,6 @@ public class Musig2 {
 
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        coefG = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
 
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
@@ -306,10 +304,9 @@ public class Musig2 {
     }
 
     // Creates the partial signature itself
-    // Currently only for V = 2
     private void signPartially () {
 
-        // TODO: Asi jde optimalizovat
+        // TODO: Optimize?
         if (!coefR.isYEven()) {
             for (short i = 0; i < Constants.V; i++) {
                 tmpBigNat.copy(modulo);
@@ -319,9 +316,18 @@ public class Musig2 {
         }
 
         partialSig.copy(challangeE);
-        partialSig.modMult(coefA, modulo);
-        partialSig.modMult(coefG, modulo);
-        partialSig.modMult(gacc, modulo);
+
+        // CoefA is a public coeficient and is often equal to 1
+        if (!coefA.isOne()) {
+            partialSig.modMult(coefA, modulo);
+        }
+
+        // Implements the coefG coeficient which is either equal to 1 or -1
+        if (!groupPubKey.isYEven()) {
+            partialSig.modNegate(modulo);
+        }
+
+        //partialSig.modMult(gacc, modulo); // Needs to be uncommented when implementing tweaks
         partialSig.modMult(secretShare, modulo);
         partialSig.modAdd(secNonce[0], modulo);
 
@@ -441,18 +447,6 @@ public class Musig2 {
         tacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
         coefA.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
 
-        // Needed for BIP implementation. In the implementation this is done each time a signature is generated.
-        coefG.copy(modulo);
-
-        // TODO: Part of tweaking in the future
-        if (this.groupPubKey.isYEven()) {
-            coefG.increment();
-        } else {
-            coefG.decrement();
-        }
-
-        coefG.mod(modulo);
-
         stateKeysEstablished = Constants.STATE_TRUE;
     }
 
@@ -553,7 +547,6 @@ public class Musig2 {
         secretShare = null;
         coefA = null;
         coefB = null;
-        coefG = null;
         challangeE = null;
         tacc = null;
         gacc = null;
