@@ -1,4 +1,29 @@
-# JavaCard Template project with Gradle
+# Musig2JC
+
+Musig2JC is a [BIP-0327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki) compliant Java Card 
+implementation of a multi-signature scheme called [MuSig2](https://eprint.iacr.org/2020/1261). It is natively supported by [Meesign](https://meesign.crocs.fi.muni.cz/)
+message signing app but can be implemented into other systems which benefit from properties of multi-signatures 
+(e.g. crypto wallets, PDF viewers, banking applications, ERPs, ...) or in systems where a redundancy of private keys is needed for security purposes.
+Musig2JC does not support tweaking.
+
+## Multi-signature
+Multi-signature is a digital signature scheme where multiple parties possessing shares of a private key sign a single message
+which can be checked against a single aggregate public key of the whole group. This means that the whole group of signers
+can sign a single message and the signature is then seen as signed by the group.
+
+Benefits of using multi-signatures as opposed to singular signatures is compatibility with legacy signature schemes (Schnorr signatures in the case of MuSig2)
+for a group of signers and spreading the risk of a private key disclosure for individual signers. If the signer creates *n* secret shares
+and saves them on *n* different cards, servers or disks, up to *n-1* of those media can be compromised by the attacker without the
+ability to produce a valid signature.
+
+You might know Bitcoin multi-signatures as described in [BIP-011](https://github.com/bitcoin/bips/blob/master/bip-0011.mediawiki)
+which produce multiple signatures and require more space as the number of signing parties rises. "Cryptographic" multi-signatures
+solve this issue by producing a signature of a fixed length regardless of the number of signing parties which significantly reduces
+transaction costs for large group of signers.
+
+Developed as a part of a master's thesis by Ondřej Chudáček (SPXcz) under supervision of Antonín Dufka ([dufkan](https://github.com/dufkan)).
+
+## JavaCard Template project with Gradle
 
 [![Build Status](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu.svg?branch=master)](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu)
 
