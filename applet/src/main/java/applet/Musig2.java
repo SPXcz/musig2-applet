@@ -23,7 +23,7 @@ public class Musig2 {
     private byte stateNoncesAggregated; // Set to TRUE if nonce is aggregated
 
     // Crypto arguments
-    // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15)
+    // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15) or BIP-0327
     // https://eprint.iacr.org/2020/1261.pdf
     private ECCurve curve;
     private ECPoint publicShare;
@@ -35,8 +35,6 @@ public class Musig2 {
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
     private BigNat challangeE;
-    private BigNat tacc; // BIP0327 coeficient
-    private BigNat gacc; // BIP0327 coeficient
     private BigNat partialSig;
     private BigNat modulo;
     private BigNat[] secNonce;
@@ -70,8 +68,6 @@ public class Musig2 {
 
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        tacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
-        gacc = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
 
         pubNonce = new ECPoint[Constants.V];
         secNonce = new BigNat[Constants.V];
@@ -435,17 +431,17 @@ public class Musig2 {
         }
     }
 
-    // Public key, gacc, tacc, coefA (33+32+32+32)
+    // Public key, coefA (33+32)
     public void setGroupPubKey (byte[] firstRoundData, short offset) {
 
-        if ((short)(offset + Constants.XCORD_LEN + 3 * Constants.SHARE_LEN) > (short) firstRoundData.length) {
+        if ((short)(offset + Constants.XCORD_LEN + Constants.SHARE_LEN) > (short) firstRoundData.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
         this.groupPubKey.decode(firstRoundData, offset, Constants.XCORD_LEN);
-        gacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
-        tacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
-        coefA.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + 2 * Constants.SHARE_LEN), Constants.SHARE_LEN);
+        //gacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
+        //tacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
+        coefA.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
 
         stateKeysEstablished = Constants.STATE_TRUE;
     }
@@ -548,8 +544,6 @@ public class Musig2 {
         coefA = null;
         coefB = null;
         challangeE = null;
-        tacc = null;
-        gacc = null;
         partialSig = null;
         modulo = null;
         secNonce = null;
