@@ -35,6 +35,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
         try {
             rm = new ResourceManager(Constants.FULL_LEN);
             curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
+            rm.fixModSqMod(curve.rBN);
             musig2 = new Musig2(curve, rm);
 
             initialized = true;
