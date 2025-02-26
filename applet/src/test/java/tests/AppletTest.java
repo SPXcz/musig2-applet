@@ -2,13 +2,16 @@ package tests;
 
 import applet.Constants;
 import applet.jcmathlib;
+import com.opencsv.CSVReaderHeaderAware;
+import com.opencsv.exceptions.CsvValidationException;
 import cz.muni.fi.crocs.rcard.client.CardType;
 import org.junit.jupiter.api.*;
 import org.testng.Assert;
 
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 
 /**
  * Example test class for the applet
@@ -18,6 +21,14 @@ import java.util.HashMap;
  */
 
 public class AppletTest extends BaseTest {
+
+    private static final List<String> LOADED_DATA = Arrays.asList(
+            "privateKey",
+            "publicKey",
+            "aggregatePublicKey",
+            "aggnonce",
+            "secnonce"
+    );
 
     public AppletTest() {
         // Change card type here if you want to use physical card
@@ -210,6 +221,114 @@ public class AppletTest extends BaseTest {
         testKeygenValues2();
         reset();
         testSignBIPReferenceData();
+    }
+
+    @Test
+    public void testKeygenCustomVectors () throws Exception {
+        String csvSource = "/keygen_test.csv";
+        List<byte[]> apduDataArray = csvToApdus(csvSource);
+        List<byte[]> pks = compareData(csvSource, "publicKeyOut");
+        assert apduDataArray.size() == pks.size();
+
+        for (int i = 0; i < apduDataArray.size(); i++) {
+            final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0, apduDataArray.get(i));
+            final ResponseAPDU responseAPDU = connect().transmit(cmd);
+            Assert.assertNotNull(responseAPDU);
+            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PLAIN_PUBKEY, 0, 0);
+            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
+
+            Assert.assertNotNull(responseAPDU2);
+            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
+            Assert.assertEquals(responseAPDU2.getData(), pks.get(i));
+            reset();
+        }
+    }
+
+//    @Test
+//    public void testNoncegenCustomVectors () throws Exception {
+//        String csvSource = "/noncegen_test.csv";
+//        List<byte[]> apduDataArray = csvToApdus(csvSource);
+//        List<byte[]> pubnonces = compareData(csvSource, "expectedPubNonce");
+//        assert apduDataArray.size() == pubnonces.size();
+//
+//        for (int i = 0; i < apduDataArray.size(); i++) {
+//
+//            System.out.println(Arrays.toString(apduDataArray.get(i)));
+//
+//            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0, apduDataArray.get(i));
+//            ResponseAPDU responseAPDU = connect().transmit(cmd);
+//
+//            Assert.assertNotNull(responseAPDU);
+//            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+//
+//            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
+//            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
+//
+//            Assert.assertNotNull(responseAPDU2);
+//            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
+//
+//            byte[] pubNonce = responseAPDU2.getData();
+//
+//            Assert.assertEquals(pubNonce, pubnonces.get(i));
+//            reset();
+//        }
+//    }
+
+    private static List<byte[]> compareData(String csvSource, String compareKey) throws IOException, CsvValidationException {
+
+        try (InputStream csvStream = AppletTest.class.getResourceAsStream(csvSource)) {
+            assert csvStream != null;
+
+            List<byte[]> compareData = new ArrayList<>();
+            CSVReaderHeaderAware csvReader = new CSVReaderHeaderAware(new InputStreamReader(csvStream));
+            Map<String, String> values;
+
+            while ((values = csvReader.readMap()) != null) {
+                byte[] compareDataByte = UtilMusig.hexStringToByteArray(values.get(compareKey));
+                compareData.add(compareDataByte);
+            }
+
+            return compareData;
+        }
+    }
+
+    private static List<byte[]> csvToApdus(String csvSource) throws IOException, CsvValidationException {
+
+        try (InputStream csvStream = AppletTest.class.getResourceAsStream(csvSource)) {
+            assert csvStream != null;
+
+            List<byte[]> apduList = new ArrayList<>();
+            CSVReaderHeaderAware csvReader = new CSVReaderHeaderAware(new InputStreamReader(csvStream));
+            Map<String, String> values;
+
+            while ((values = csvReader.readMap()) != null) {
+                apduList.add(hashMapToApduData(values));
+            }
+
+            return apduList;
+        }
+    }
+
+    private static byte[] hashMapToApduData(Map<String, String> csvMap) {
+
+        byte[] apduData = new byte[]{
+                Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE,
+                Constants.STATE_FALSE, Constants.STATE_FALSE
+        };
+
+        for (int i = 0; i < LOADED_DATA.size(); i++) {
+            if (csvMap.containsKey(LOADED_DATA.get(i))
+                    && csvMap.get(LOADED_DATA.get(i)) != null
+                    && !Objects.equals(csvMap.get(LOADED_DATA.get(i)), "")) {
+                apduData[i] = Constants.STATE_TRUE;
+                byte[] asBytes = UtilMusig.hexStringToByteArray(csvMap.get(LOADED_DATA.get(i)));
+                apduData = concatenate(apduData, asBytes);
+            }
+        }
+
+        return apduData;
     }
 
     // Generated by GitHub Copilot
