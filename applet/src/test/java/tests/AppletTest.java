@@ -27,7 +27,8 @@ public class AppletTest extends BaseTest {
             "publicKey",
             "aggregatePublicKey",
             "aggnonce",
-            "secnonce"
+            "secnonce",
+            "messages"
     );
 
     public AppletTest() {
@@ -227,7 +228,7 @@ public class AppletTest extends BaseTest {
     public void testKeygenCustomVectors () throws Exception {
         String csvSource = "/keygen_test.csv";
         List<byte[]> apduDataArray = csvToApdus(csvSource);
-        List<byte[]> pks = compareData(csvSource, "publicKeyOut");
+        List<byte[]> pks = individualColumn(csvSource, "publicKeyOut");
         assert apduDataArray.size() == pks.size();
 
         for (int i = 0; i < apduDataArray.size(); i++) {
@@ -246,37 +247,71 @@ public class AppletTest extends BaseTest {
         }
     }
 
-//    @Test
-//    public void testNoncegenCustomVectors () throws Exception {
-//        String csvSource = "/noncegen_test.csv";
-//        List<byte[]> apduDataArray = csvToApdus(csvSource);
-//        List<byte[]> pubnonces = compareData(csvSource, "expectedPubNonce");
-//        assert apduDataArray.size() == pubnonces.size();
-//
-//        for (int i = 0; i < apduDataArray.size(); i++) {
-//
-//            System.out.println(Arrays.toString(apduDataArray.get(i)));
-//
-//            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0, apduDataArray.get(i));
-//            ResponseAPDU responseAPDU = connect().transmit(cmd);
-//
-//            Assert.assertNotNull(responseAPDU);
-//            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-//
-//            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
-//            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-//
-//            Assert.assertNotNull(responseAPDU2);
-//            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
-//
-//            byte[] pubNonce = responseAPDU2.getData();
-//
-//            Assert.assertEquals(pubNonce, pubnonces.get(i));
-//            reset();
-//        }
-//    }
+    @Test
+    public void testNoncegenCustomVectors () throws Exception {
+        String csvSource = "/noncegen_test.csv";
+        List<byte[]> apduDataArray = csvToApdus(csvSource);
+        List<byte[]> pubnonces = individualColumn(csvSource, "expectedPubNonce");
+        assert apduDataArray.size() == pubnonces.size();
 
-    private static List<byte[]> compareData(String csvSource, String compareKey) throws IOException, CsvValidationException {
+        for (int i = 0; i < apduDataArray.size(); i++) {
+
+            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0, apduDataArray.get(i));
+            ResponseAPDU responseAPDU = connect().transmit(cmd);
+
+            Assert.assertNotNull(responseAPDU);
+            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
+            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
+
+            Assert.assertNotNull(responseAPDU2);
+            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
+
+            byte[] pubNonce = responseAPDU2.getData();
+
+            Assert.assertEquals(pubNonce, pubnonces.get(i));
+            reset();
+        }
+    }
+
+    @Test
+    public void testSignCustomVectors () throws Exception {
+        String csvSource = "/sign_test.csv";
+        List<byte[]> apduDataArray = csvToApdus(csvSource);
+        List<byte[]> signatures = individualColumn(csvSource, "expectedSignature");
+        assert apduDataArray.size() == signatures.size();
+
+        List<byte[]> aggkeys = individualColumn(csvSource, "aggregatePublicKeyTest");
+        List<byte[]> coefAs = individualColumn(csvSource, "coefA");
+        assert aggkeys.size() == coefAs.size();
+        assert aggkeys.size() == signatures.size();
+        List<byte[]> firstRoundData = new ArrayList<>();
+
+        for (int i = 0; i < aggkeys.size(); i++) {
+            byte[] apduBytes = aggkeys.get(i);
+            apduBytes = concatenate(apduBytes, coefAs.get(i));
+            firstRoundData.add(apduBytes);
+        }
+
+        for (int i = 0; i < apduDataArray.size(); i++) {
+            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
+            ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
+
+            Assert.assertNotNull(responseAPDUSetUp);
+            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
+
+            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, apduDataArray.get(i));
+            ResponseAPDU responseAPDU = connect().transmit(cmd);
+
+            Assert.assertNotNull(responseAPDU);
+            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+            Assert.assertEquals(responseAPDU.getData(), signatures.get(i));
+            reset();
+        }
+    }
+
+    private static List<byte[]> individualColumn(String csvSource, String compareKey) throws IOException, CsvValidationException {
 
         try (InputStream csvStream = AppletTest.class.getResourceAsStream(csvSource)) {
             assert csvStream != null;
@@ -322,7 +357,11 @@ public class AppletTest extends BaseTest {
             if (csvMap.containsKey(LOADED_DATA.get(i))
                     && csvMap.get(LOADED_DATA.get(i)) != null
                     && !Objects.equals(csvMap.get(LOADED_DATA.get(i)), "")) {
-                apduData[i] = Constants.STATE_TRUE;
+
+                if (i < 5) {
+                    apduData[i] = Constants.STATE_TRUE;
+                }
+
                 byte[] asBytes = UtilMusig.hexStringToByteArray(csvMap.get(LOADED_DATA.get(i)));
                 apduData = concatenate(apduData, asBytes);
             }

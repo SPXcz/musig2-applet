@@ -160,7 +160,7 @@ public class Musig2 {
 
         // Digest group public key if it is already established
         if (stateKeysEstablished == Constants.STATE_TRUE) {
-            tmpArray[0] = Constants.XCORD_LEN;
+            tmpArray[0] = (short)(Constants.XCORD_LEN-1);
             groupPubKey.getX(tmpArray, (short) 1);
             digest.update(tmpArray, (short) 0, Constants.XCORD_LEN); // +1 for the length attribute and -1 for Xonly encoding
         } else {
@@ -459,7 +459,7 @@ public class Musig2 {
         stateNoncesAggregated = Constants.STATE_TRUE;
     }
 
-    // sk + pk + aggpk (5 + 32 + 33 + 33 + 66 + 64)
+    // sk + pk + aggpk + pubnonce + secnonce  (5 + 32 + 33 + 33 + 66 + 64)
     public short setTestingValues (byte[] buffer, short offset) {
 
             if (Constants.DEBUG == Constants.STATE_FALSE) {
