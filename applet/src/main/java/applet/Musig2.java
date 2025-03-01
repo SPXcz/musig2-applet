@@ -192,20 +192,6 @@ public class Musig2 {
                       byte[] outBuffer,
                       short outOffset) {
 
-        short msgOffset = inOffset;
-        short msgLength = inLength;
-
-        if (Constants.DEBUG == Constants.STATE_TRUE
-                && messageBuffer[inOffset] == Constants.STATE_TRUE
-                && messageBuffer[(short) (inOffset + 1)] == Constants.STATE_FALSE) {
-            if (Constants.DEBUG != Constants.STATE_FALSE) {
-                msgOffset = setTestingValues(messageBuffer, inOffset);
-                msgLength = (short) (inLength - (short) (msgOffset - inOffset));
-            } else {
-                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-            }
-        }
-
         if (stateReadyForSigning == Constants.STATE_FALSE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
@@ -215,12 +201,12 @@ public class Musig2 {
         }
 
         // TODO: Jak resit maximalni delku zpravy? (limitace JavaCard)
-        if (msgLength > Constants.MAX_MESSAGE_LEN) {
+        if (inLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
         }
 
-        if ((short) (msgOffset + msgLength) > (short) messageBuffer.length) {
+        if ((short) (inOffset + inLength) > (short) messageBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -230,9 +216,9 @@ public class Musig2 {
             return (short) -1;
         }
 
-        generateCoefB(messageBuffer, msgOffset, msgLength);
+        generateCoefB(messageBuffer, inOffset, inLength);
         generateCoefR();
-        generateChallengeE(messageBuffer, msgOffset, msgLength);
+        generateChallengeE(messageBuffer, inOffset, inLength);
         signPartially();
 
         writePartialSignatureOut(outBuffer, outOffset);

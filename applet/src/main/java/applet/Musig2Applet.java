@@ -113,6 +113,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
 
     private void setAggPubKey (APDU apdu) {
         byte[] apduBuffer = apdu.getBuffer();
+
         musig2.setGroupPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
     }
 
@@ -143,6 +144,21 @@ public class Musig2Applet extends Applet implements AppletEvent {
     private void reset(APDU apdu) {
         musig2.reset();
         apdu.setOutgoing();
+    }
+
+    private void setUpTestData(APDU apdu) {
+        byte[] apduBuffer = apdu.getBuffer();
+        short inOffset = ISO7816.OFFSET_CDATA;
+
+        if (Constants.DEBUG == Constants.STATE_TRUE
+                && apduBuffer[inOffset] == Constants.STATE_TRUE
+                && apduBuffer[(short) (inOffset + 1)] == Constants.STATE_FALSE) {
+            if (Constants.DEBUG != Constants.STATE_FALSE) {
+                musig2.setTestingValues(apduBuffer, inOffset);
+            } else {
+                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+            }
+        }
     }
 
     public boolean select() {
@@ -195,6 +211,9 @@ public class Musig2Applet extends Applet implements AppletEvent {
                     break;
                 case Constants.INS_RESET:
                     reset(apdu);
+                    break;
+                case Constants.INS_SETUP_TEST_DATA:
+                    setUpTestData(apdu);
                     break;
                 default:
                     ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
