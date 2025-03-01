@@ -27,8 +27,7 @@ public class AppletTest extends BaseTest {
             "publicKey",
             "aggregatePublicKey",
             "aggnonce",
-            "secnonce",
-            "messages"
+            "secnonce"
     );
 
     public AppletTest() {
@@ -72,7 +71,7 @@ public class AppletTest extends BaseTest {
         Assert.assertEquals(0x9000, responseAPDU.getSW());
     }
 
-    // Example test
+    // Sanity check
     @Test
     public void testKeygenExecutes() throws Exception {
         final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0);
@@ -191,19 +190,24 @@ public class AppletTest extends BaseTest {
         data.put("expectedSignature", UtilMusig.hexStringToByteArray("012ABBCB52B3016AC03AD82395A1A415C48B93DEF78718E62A7A90052FE224FB"));
         byte[] msg = UtilMusig.hexStringToByteArray("F95466D086770E689964664219266FE5ED215C92AE20BAB5C9D79ADDDDF3C0CF");
 
-        byte[] dataSetUpPubKey = data.get("aggregatePublicKeyTest");
-        dataSetUpPubKey = concatenate(dataSetUpPubKey, data.get("coefA"));
+        byte[] dataBytes = concatenateDeter(data);
 
-        CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, dataSetUpPubKey);
+        CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, dataBytes);
         ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
 
         Assert.assertNotNull(responseAPDUSetUp);
         Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
 
-        byte[] dataBytes = concatenateDeter(data);
-        dataBytes = concatenate(dataBytes, msg);
+        byte[] dataSetUpPubKey = data.get("aggregatePublicKeyTest");
+        dataSetUpPubKey = concatenate(dataSetUpPubKey, data.get("coefA"));
 
-        CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, dataBytes);
+        cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, dataSetUpPubKey);
+        responseAPDUSetUp = connect().transmit(cmdSetUp);
+
+        Assert.assertNotNull(responseAPDUSetUp);
+        Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
+
+        CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, msg);
         ResponseAPDU responseAPDU = connect().transmit(cmd);
 
         Assert.assertNotNull(responseAPDU);
@@ -278,14 +282,16 @@ public class AppletTest extends BaseTest {
     @Test
     public void testSignCustomVectors () throws Exception {
         String csvSource = "/sign_test.csv";
-        List<byte[]> apduDataArray = csvToApdus(csvSource);
+        List<byte[]> setUpTestData = csvToApdus(csvSource);
         List<byte[]> signatures = individualColumn(csvSource, "expectedSignature");
-        assert apduDataArray.size() == signatures.size();
+        assert setUpTestData.size() == signatures.size();
 
         List<byte[]> aggkeys = individualColumn(csvSource, "aggregatePublicKeyTest");
         List<byte[]> coefAs = individualColumn(csvSource, "coefA");
+        List<byte[]> messages = individualColumn(csvSource, "messages");
         assert aggkeys.size() == coefAs.size();
         assert aggkeys.size() == signatures.size();
+        assert messages.size() == signatures.size();
         List<byte[]> firstRoundData = new ArrayList<>();
 
         for (int i = 0; i < aggkeys.size(); i++) {
@@ -294,14 +300,21 @@ public class AppletTest extends BaseTest {
             firstRoundData.add(apduBytes);
         }
 
-        for (int i = 0; i < apduDataArray.size(); i++) {
-            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
+        for (int i = 0; i < setUpTestData.size(); i++) {
+
+            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, setUpTestData.get(i));
             ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
 
             Assert.assertNotNull(responseAPDUSetUp);
             Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
 
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, apduDataArray.get(i));
+            cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
+            responseAPDUSetUp = connect().transmit(cmdSetUp);
+
+            Assert.assertNotNull(responseAPDUSetUp);
+            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
+
+            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, messages.get(i));
             ResponseAPDU responseAPDU = connect().transmit(cmd);
 
             Assert.assertNotNull(responseAPDU);

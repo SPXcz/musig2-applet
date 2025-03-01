@@ -32,6 +32,7 @@ public class Constants {
     public static final byte INS_COMBINE_NONCES = (byte) 0x6F;
     public static final byte INS_SIGN = (byte) 0x49;
     public static final byte INS_RESET = (byte) 0x65;
+    public static final byte INS_SETUP_TEST_DATA = (byte) 0x67;
 
     // States
     public static final byte STATE_TRUE = (byte) 0xF4;
