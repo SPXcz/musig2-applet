@@ -39,15 +39,17 @@ public class Constants {
     public static final byte STATE_FALSE = (byte) 0x2C;
 
     // Err
-    public static final byte E_TOO_FEW_PARTICIPANTS = (byte) 0x7F;
-    public static final byte E_TOO_MANY_PARTICIPANTS = (byte) 0x4F;
-    public static final byte E_BUFFER_OVERLOW = (byte) 0xCA;
-    public static final byte E_CRYPTO_EXCEPTION = (byte) 0x77;
-    public static final byte E_MESSAGE_TOO_LONG = (byte) 0x88;
-    public static final byte E_WRONG_XCORD_LEN = (byte) 0x99;
-    public static final byte E_ALL_PUBKEYSHARES_SAME = (byte) 0xAA;
-    public static final byte E_TWEAK_TOO_LONG = (byte) 0xBB;
-    public static final byte E_HASHER_UNINITIALIZED = (byte) 0xCC;
+    public static final short E_TOO_FEW_PARTICIPANTS = (byte) 0xFF7F;
+    public static final short E_TOO_MANY_PARTICIPANTS = (byte) 0xFF4F;
+    public static final short E_BUFFER_OVERLOW = (byte) 0xFFCA;
+    public static final short E_CRYPTO_EXCEPTION = (byte) 0xFF77;
+    public static final short E_MESSAGE_TOO_LONG = (byte) 0xFF88;
+    public static final short E_NO_MESSAGE = (byte) 0xFF89;
+    public static final short E_WRONG_XCORD_LEN = (byte) 0xFF99;
+    public static final short E_ALL_PUBKEYSHARES_SAME = (byte) 0xFFAA;
+    public static final short E_TWEAK_TOO_LONG = (byte) 0xFFBB;
+    public static final short E_HASHER_UNINITIALIZED = (byte) 0xFFCC;
+    public static final short E_POSSIBLE_SECNONCE_REUSE = (byte) 0xFFCD;
 
     // Generic err
     // Taken from jcfrost.Consts

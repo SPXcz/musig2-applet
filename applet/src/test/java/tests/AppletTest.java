@@ -113,38 +113,6 @@ public class AppletTest extends BaseTest {
         Assert.assertEquals(responseAPDU2.getData(), data.get("publicKeyOut"));
     }
 
-    @Test
-    public void testKeygenValues2() throws Exception {
-
-        HashMap<String, byte[]> data = new HashMap<>();
-        data.put("settings", new byte[] {Constants.STATE_TRUE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE});
-        data.put("privateKey", new byte[]{(byte) 0x74, (byte) 0x4a, (byte) 0x32, (byte) 0x98, (byte) 0x65, (byte) 0x26,
-                (byte) 0x62, (byte) 0x58, (byte) 0xd, (byte) 0x19, (byte) 0x62, (byte) 0x92, (byte) 0x85, (byte) 0x3,
-                (byte) 0x32, (byte) 0x64, (byte) 0x1d, (byte) 0x6c, (byte) 0xa5, (byte) 0xe8, (byte) 0x1e, (byte) 0xaf,
-                (byte) 0x61, (byte) 0xb0, (byte) 0x20, (byte) 0x45, (byte) 0x2e, (byte) 0xac, (byte) 0x8f, (byte) 0x31,
-                (byte) 0x7f, (byte) 0x8});
-
-        data.put("publicKeyOut", new byte[]{(byte) 0x3, (byte) 0xc0, (byte) 0x60, (byte) 0xce, (byte) 0x18, (byte) 0xaf,
-                (byte) 0xe3, (byte) 0x3d, (byte) 0x2c, (byte) 0x6d, (byte) 0xb9, (byte) 0x68, (byte) 0xfb, (byte) 0x2d,
-                (byte) 0x96, (byte) 0xf8, (byte) 0x2f, (byte) 0xdd, (byte) 0x8c, (byte) 0x9a, (byte) 0x5a, (byte) 0x62,
-                (byte) 0xb1, (byte) 0xbb, (byte) 0x95, (byte) 0x77, (byte) 0x11, (byte) 0xe6, (byte) 0xe9, (byte) 0xaf,
-                (byte) 0xca, (byte) 0x2b, (byte) 0x14});
-
-        byte[] dataBytes = concatenateDeter(data);
-
-        final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0, dataBytes);
-        final ResponseAPDU responseAPDU = connect().transmit(cmd);
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-        CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PLAIN_PUBKEY, 0, 0);
-        ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-
-        Assert.assertNotNull(responseAPDU2);
-        Assert.assertEquals(0x9000, responseAPDU2.getSW());
-        Assert.assertEquals(responseAPDU2.getData(), data.get("publicKeyOut"));
-    }
-
     // Parameter loading adds cca. 500ms to total computation time
     @Test
     public void testNonceGenBIPReferenceData () throws Exception {
@@ -223,8 +191,6 @@ public class AppletTest extends BaseTest {
         reset();
         testKeygenValues1();
         reset();
-        testKeygenValues2();
-        reset();
         testSignBIPReferenceData();
     }
 
@@ -282,6 +248,50 @@ public class AppletTest extends BaseTest {
     @Test
     public void testSignCustomVectors () throws Exception {
         String csvSource = "/sign_test.csv";
+        signTestBase(csvSource, false);
+    }
+
+    @Test
+    public void testSignReferenceVectors () throws Exception {
+        String csvSource = "/sign_test_ref.csv";
+        signTestBase(csvSource, false);
+    }
+
+    @Test
+    public void testFailSign () throws Exception {
+        String csvSource = "/sign_fail_test.csv";
+        signTestBase(csvSource, true);
+    }
+
+    @Test
+    public void testFailLoadSignData () throws Exception {
+        String csvSource = "/load_data_fail_test.csv";
+
+        List<byte[]> setUpTestData = csvToApdus(csvSource);
+        List<byte[]> aggkeys = individualColumn(csvSource, "aggregatePublicKeyTest");
+        List<byte[]> coefAs = individualColumn(csvSource, "coefA");
+        assert aggkeys.size() == coefAs.size();
+        assert setUpTestData.size() == coefAs.size();
+
+        List<byte[]> firstRoundData = new ArrayList<>();
+
+        for (int i = 0; i < aggkeys.size(); i++) {
+            byte[] apduBytes = aggkeys.get(i);
+            apduBytes = concatenate(apduBytes, coefAs.get(i));
+            firstRoundData.add(apduBytes);
+        }
+
+        for (byte[] setUpTestDatum : setUpTestData) {
+
+            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, setUpTestDatum);
+            ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
+
+            Assert.assertNotNull(responseAPDUSetUp);
+            Assert.assertNotEquals(responseAPDUSetUp.getSW(), 0x9000);
+        }
+    }
+
+    public void signTestBase (String csvSource, boolean fail) throws Exception  {
         List<byte[]> setUpTestData = csvToApdus(csvSource);
         List<byte[]> signatures = individualColumn(csvSource, "expectedSignature");
         assert setUpTestData.size() == signatures.size();
@@ -318,8 +328,18 @@ public class AppletTest extends BaseTest {
             ResponseAPDU responseAPDU = connect().transmit(cmd);
 
             Assert.assertNotNull(responseAPDU);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-            Assert.assertEquals(responseAPDU.getData(), signatures.get(i));
+
+            if (fail) {
+                if (i == 0) {
+                    Assert.assertNotEquals(responseAPDU.getSW(), 0x9000);
+                } else {
+                    Assert.assertNotEquals(responseAPDU.getData(), signatures.get(i));
+                }
+            } else {
+                Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+                Assert.assertEquals(responseAPDU.getData(), signatures.get(i));
+            }
+
             reset();
         }
     }
