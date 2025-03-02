@@ -7,6 +7,13 @@ import javacard.security.CryptoException;
 
 public class Musig2Applet extends Applet implements AppletEvent {
 
+    /**
+     * Noncompliance with BIP0327:
+     *  - Message length can be only up to 255 bytes instead of 2^61-1 bytes.
+     *  - Tweaks are not supported.
+     *  - If aggnonce is a point in infinity, the card throws an error. (Problem with JCMathLib)
+     */
+
     // Utils
     private boolean initialized = false;
     private ResourceManager rm;

@@ -134,7 +134,7 @@ public class Musig2 {
 
     }
 
-    private void generateSecNonce (BigNat secNonce, short kIndex) {
+    private void generateSecNonce (BigNat secNonceLocal, short kIndex) {
 
         BigNat rand = tmpBigNat;
 
@@ -182,13 +182,17 @@ public class Musig2 {
                 digestHelper,
                 (short) 0);
 
-        secNonce.fromByteArray(digestHelper, (short) 0, Constants.HASH_LEN);
-        secNonce.mod(modulo);
+        secNonceLocal.fromByteArray(digestHelper, (short) 0, Constants.HASH_LEN);
+        secNonceLocal.mod(modulo);
+
+        if (secNonceLocal.isZero()) {
+            ISOException.throwIt(Constants.E_POSSIBLE_SECNONCE_REUSE);
+        }
     }
 
     public short sign (byte[] messageBuffer,
                       short inOffset,
-                      short inLength,
+                      short msgLength,
                       byte[] outBuffer,
                       short outOffset) {
 
@@ -201,12 +205,17 @@ public class Musig2 {
         }
 
         // TODO: Jak resit maximalni delku zpravy? (limitace JavaCard)
-        if (inLength > Constants.MAX_MESSAGE_LEN) {
+        if (msgLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
         }
 
-        if ((short) (inOffset + inLength) > (short) messageBuffer.length) {
+//        if (msgLength <= 0) {
+//            ISOException.throwIt(Constants.E_NO_MESSAGE);
+//            return (short) -1;
+//        }
+
+        if ((short) (inOffset + msgLength) > (short) messageBuffer.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -216,9 +225,15 @@ public class Musig2 {
             return (short) -1;
         }
 
-        generateCoefB(messageBuffer, inOffset, inLength);
+        for (short i = 0; i < Constants.V; i++) {
+            if (secNonce[i].isZero()) {
+                ISOException.throwIt(Constants.E_POSSIBLE_SECNONCE_REUSE);
+            }
+        }
+
+        generateCoefB(messageBuffer, inOffset, msgLength);
         generateCoefR();
-        generateChallengeE(messageBuffer, inOffset, inLength);
+        generateChallengeE(messageBuffer, inOffset, msgLength);
         signPartially();
 
         writePartialSignatureOut(outBuffer, outOffset);
@@ -435,12 +450,24 @@ public class Musig2 {
     // 33 + 33
     public void setNonceAggregate (byte[] nonces, short offset) {
 
+        short currentOffset = offset;
+
         if ((short)(offset + 2 * Constants.XCORD_LEN) > (short) nonces.length) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
+        if (nonces[offset] != (byte) 0x02 && nonces[offset] != (byte) 0x03) {
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        }
+
         aggNonce[0].decode(nonces, offset, Constants.XCORD_LEN);
-        aggNonce[1].decode(nonces, (short) (offset + Constants.XCORD_LEN), Constants.XCORD_LEN);
+        currentOffset += Constants.XCORD_LEN;
+
+        if (nonces[currentOffset] != (byte) 0x02 && nonces[currentOffset] != (byte) 0x03) {
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        }
+
+        aggNonce[1].decode(nonces, currentOffset, Constants.XCORD_LEN);
 
         stateNoncesAggregated = Constants.STATE_TRUE;
     }
@@ -480,8 +507,18 @@ public class Musig2 {
 
             // Aggregated nonce
             if (buffer[(short)(offset + 3)] == Constants.STATE_TRUE) {
+
+                if (buffer[currentOffset] != (byte) 0x02 && buffer[currentOffset] != (byte) 0x03) {
+                    ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+                }
+
                 aggNonce[0].decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
+
+                if (buffer[currentOffset] != (byte) 0x02 && buffer[currentOffset] != (byte) 0x03) {
+                    ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+                }
+
                 aggNonce[1].decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
                 stateNoncesAggregated = Constants.STATE_TRUE;
