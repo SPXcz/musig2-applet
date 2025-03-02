@@ -1751,7 +1751,7 @@ public class jcmathlib {
 
                 //Y^2 = X^3 + XA + B = x(x^2+A)+B
                 y.clone(x);
-                y.modSq(curve.pBN);  // TODO: TADY 0xf101
+                y.modSq(curve.pBN);
                 y.modAdd(curve.aBN, curve.pBN);
 
                 y.modMult(x, curve.pBN);
