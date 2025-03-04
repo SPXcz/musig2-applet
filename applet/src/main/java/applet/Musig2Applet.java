@@ -80,14 +80,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
         ISOException.throwIt(ISO7816.SW_NO_ERROR);
     }
 
-    private void nonceGen (APDU apdu) {
-
-        byte[] apduBuffer = apdu.getBuffer();
-
-        if (Constants.DEBUG == Constants.STATE_TRUE) {
-            musig2.setTestingValues(apduBuffer, ISO7816.OFFSET_CDATA);
-        }
-
+    private void nonceGen () {
         musig2.nonceGen();
     }
 
@@ -157,9 +150,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
         byte[] apduBuffer = apdu.getBuffer();
         short inOffset = ISO7816.OFFSET_CDATA;
 
-        if (Constants.DEBUG == Constants.STATE_TRUE
-                && apduBuffer[inOffset] == Constants.STATE_TRUE
-                && apduBuffer[(short) (inOffset + 1)] == Constants.STATE_FALSE) {
+        if (Constants.DEBUG == Constants.STATE_TRUE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
                 musig2.setTestingValues(apduBuffer, inOffset);
             } else {
@@ -196,7 +187,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
                     generateKeys(apdu);
                     break;
                 case Constants.INS_GENERATE_NONCES:
-                    nonceGen(apdu);
+                    nonceGen();
                     break;
                 case Constants.INS_SIGN:
                     sign(apdu);
