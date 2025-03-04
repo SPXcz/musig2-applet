@@ -13,6 +13,8 @@ import javax.smartcardio.ResponseAPDU;
 import java.io.*;
 import java.util.*;
 
+import static tests.UtilMusig.concatenateDeter;
+
 /**
  * Example test class for the applet
  * Note: If simulator cannot be started try adding "-noverify" JVM parameter
@@ -20,39 +22,7 @@ import java.util.*;
  * @author xsvenda, Dusan Klinec (ph4r05)
  */
 
-public class AppletTest extends BaseTest {
-
-    private static final List<String> LOADED_DATA = Arrays.asList(
-            "privateKey",
-            "publicKey",
-            "aggregatePublicKey",
-            "aggnonce",
-            "secnonce"
-    );
-
-    public AppletTest() {
-        // Change card type here if you want to use physical card
-
-        //setCardType(CardType.PHYSICAL);
-        // setCardType(CardType.REMOTE);
-        if (Constants.CARD_TYPE == jcmathlib.OperationSupport.JCOP4_P71) {
-            setCardType(CardType.PHYSICAL);
-        } else if (Constants.CARD_TYPE == jcmathlib.OperationSupport.SIMULATOR) {
-            setCardType(CardType.JCARDSIMLOCAL);
-        }
-        setSimulateStateful(true);
-    }
-
-    @BeforeAll
-    public static void setUpClass() throws Exception {
-
-    }
-
-
-    @AfterAll
-    public static void tearDownClass() throws Exception {
-
-    }
+public class AppletTest extends MusigTest {
 
     @BeforeEach
     public void setUpMethod() throws Exception {
@@ -64,20 +34,13 @@ public class AppletTest extends BaseTest {
         reset();
     }
 
-    private void reset () throws Exception {
-        final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_RESET, 0, 0);
-        final ResponseAPDU responseAPDU = connect().transmit(cmd);
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(0x9000, responseAPDU.getSW());
-    }
-
     // Sanity check
     @Test
     public void testKeygenExecutes() throws Exception {
         final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0);
         final ResponseAPDU responseAPDU = connect().transmit(cmd);
         Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(0x9000, responseAPDU.getSW());
+        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
         Assert.assertNotNull(responseAPDU.getBytes());
     }
 
@@ -98,12 +61,12 @@ public class AppletTest extends BaseTest {
                 (byte) 0x58, (byte) 0xff, (byte) 0xef, (byte) 0xf7, (byte) 0x49, (byte) 0x21, (byte) 0xd5, (byte) 0x6e,
                 (byte) 0x91, (byte) 0x29, (byte) 0x83});
 
-        byte[] dataBytes = concatenateDeter(data);
+        byte[] dataBytes = UtilMusig.concatenateDeter(data);
 
         final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0, dataBytes);
         final ResponseAPDU responseAPDU = connect().transmit(cmd);
         Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(0x9000, responseAPDU.getSW());
+        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
 
         CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_XONLY_PUBKEY, 0, 0);
         ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
@@ -125,8 +88,14 @@ public class AppletTest extends BaseTest {
 
         byte[] dataBytes = concatenateDeter(data);
 
-        CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0, dataBytes);
+        CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, dataBytes);
         ResponseAPDU responseAPDU = connect().transmit(cmd);
+
+        Assert.assertNotNull(responseAPDU);
+        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+        cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0);
+        responseAPDU = connect().transmit(cmd);
 
         Assert.assertNotNull(responseAPDU);
         Assert.assertEquals(responseAPDU.getSW(), 0x9000);
@@ -167,7 +136,7 @@ public class AppletTest extends BaseTest {
         Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
 
         byte[] dataSetUpPubKey = data.get("aggregatePublicKeyTest");
-        dataSetUpPubKey = concatenate(dataSetUpPubKey, data.get("coefA"));
+        dataSetUpPubKey = UtilMusig.concatenate(dataSetUpPubKey, data.get("coefA"));
 
         cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, dataSetUpPubKey);
         responseAPDUSetUp = connect().transmit(cmdSetUp);
@@ -197,8 +166,8 @@ public class AppletTest extends BaseTest {
     @Test
     public void testKeygenCustomVectors () throws Exception {
         String csvSource = "/keygen_test.csv";
-        List<byte[]> apduDataArray = csvToApdus(csvSource);
-        List<byte[]> pks = individualColumn(csvSource, "publicKeyOut");
+        List<byte[]> apduDataArray = UtilMusig.csvToApdus(csvSource, AppletTest.class);
+        List<byte[]> pks = UtilMusig.individualColumn(csvSource, "publicKeyOut");
         assert apduDataArray.size() == pks.size();
 
         for (int i = 0; i < apduDataArray.size(); i++) {
@@ -220,14 +189,20 @@ public class AppletTest extends BaseTest {
     @Test
     public void testNoncegenCustomVectors () throws Exception {
         String csvSource = "/noncegen_test.csv";
-        List<byte[]> apduDataArray = csvToApdus(csvSource);
-        List<byte[]> pubnonces = individualColumn(csvSource, "expectedPubNonce");
+        List<byte[]> apduDataArray = UtilMusig.csvToApdus(csvSource, AppletTest.class);
+        List<byte[]> pubnonces = UtilMusig.individualColumn(csvSource, "expectedPubNonce");
         assert apduDataArray.size() == pubnonces.size();
 
         for (int i = 0; i < apduDataArray.size(); i++) {
 
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0, apduDataArray.get(i));
+            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, apduDataArray.get(i));
             ResponseAPDU responseAPDU = connect().transmit(cmd);
+
+            Assert.assertNotNull(responseAPDU);
+            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+            cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0);
+            responseAPDU = connect().transmit(cmd);
 
             Assert.assertNotNull(responseAPDU);
             Assert.assertEquals(responseAPDU.getSW(), 0x9000);
@@ -248,38 +223,30 @@ public class AppletTest extends BaseTest {
     @Test
     public void testSignCustomVectors () throws Exception {
         String csvSource = "/sign_test.csv";
-        signTestBase(csvSource, false);
+        signTestBase(csvSource, false, false);
     }
 
     @Test
     public void testSignReferenceVectors () throws Exception {
         String csvSource = "/sign_test_ref.csv";
-        signTestBase(csvSource, false);
+        signTestBase(csvSource, false, false);
     }
 
     @Test
     public void testFailSign () throws Exception {
         String csvSource = "/sign_fail_test.csv";
-        signTestBase(csvSource, true);
+        signTestBase(csvSource, true, false);
     }
 
     @Test
     public void testFailLoadSignData () throws Exception {
         String csvSource = "/load_data_fail_test.csv";
 
-        List<byte[]> setUpTestData = csvToApdus(csvSource);
-        List<byte[]> aggkeys = individualColumn(csvSource, "aggregatePublicKeyTest");
-        List<byte[]> coefAs = individualColumn(csvSource, "coefA");
+        List<byte[]> setUpTestData = UtilMusig.csvToApdus(csvSource, AppletTest.class);
+        List<byte[]> aggkeys = UtilMusig.individualColumn(csvSource, "aggregatePublicKeyTest");
+        List<byte[]> coefAs = UtilMusig.individualColumn(csvSource, "coefA");
         assert aggkeys.size() == coefAs.size();
         assert setUpTestData.size() == coefAs.size();
-
-        List<byte[]> firstRoundData = new ArrayList<>();
-
-        for (int i = 0; i < aggkeys.size(); i++) {
-            byte[] apduBytes = aggkeys.get(i);
-            apduBytes = concatenate(apduBytes, coefAs.get(i));
-            firstRoundData.add(apduBytes);
-        }
 
         for (byte[] setUpTestDatum : setUpTestData) {
 
@@ -289,153 +256,5 @@ public class AppletTest extends BaseTest {
             Assert.assertNotNull(responseAPDUSetUp);
             Assert.assertNotEquals(responseAPDUSetUp.getSW(), 0x9000);
         }
-    }
-
-    public void signTestBase (String csvSource, boolean fail) throws Exception  {
-        List<byte[]> setUpTestData = csvToApdus(csvSource);
-        List<byte[]> signatures = individualColumn(csvSource, "expectedSignature");
-        assert setUpTestData.size() == signatures.size();
-
-        List<byte[]> aggkeys = individualColumn(csvSource, "aggregatePublicKeyTest");
-        List<byte[]> coefAs = individualColumn(csvSource, "coefA");
-        List<byte[]> messages = individualColumn(csvSource, "messages");
-        assert aggkeys.size() == coefAs.size();
-        assert aggkeys.size() == signatures.size();
-        assert messages.size() == signatures.size();
-        List<byte[]> firstRoundData = new ArrayList<>();
-
-        for (int i = 0; i < aggkeys.size(); i++) {
-            byte[] apduBytes = aggkeys.get(i);
-            apduBytes = concatenate(apduBytes, coefAs.get(i));
-            firstRoundData.add(apduBytes);
-        }
-
-        for (int i = 0; i < setUpTestData.size(); i++) {
-
-            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, setUpTestData.get(i));
-            ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
-
-            Assert.assertNotNull(responseAPDUSetUp);
-            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
-
-            cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
-            responseAPDUSetUp = connect().transmit(cmdSetUp);
-
-            Assert.assertNotNull(responseAPDUSetUp);
-            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
-
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, messages.get(i));
-            ResponseAPDU responseAPDU = connect().transmit(cmd);
-
-            Assert.assertNotNull(responseAPDU);
-
-            if (fail) {
-                if (i == 0) {
-                    Assert.assertNotEquals(responseAPDU.getSW(), 0x9000);
-                } else {
-                    Assert.assertNotEquals(responseAPDU.getData(), signatures.get(i));
-                }
-            } else {
-                Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-                Assert.assertEquals(responseAPDU.getData(), signatures.get(i));
-            }
-
-            reset();
-        }
-    }
-
-    private static List<byte[]> individualColumn(String csvSource, String compareKey) throws IOException, CsvValidationException {
-
-        try (InputStream csvStream = AppletTest.class.getResourceAsStream(csvSource)) {
-            assert csvStream != null;
-
-            List<byte[]> compareData = new ArrayList<>();
-            CSVReaderHeaderAware csvReader = new CSVReaderHeaderAware(new InputStreamReader(csvStream));
-            Map<String, String> values;
-
-            while ((values = csvReader.readMap()) != null) {
-                byte[] compareDataByte = UtilMusig.hexStringToByteArray(values.get(compareKey));
-                compareData.add(compareDataByte);
-            }
-
-            return compareData;
-        }
-    }
-
-    private static List<byte[]> csvToApdus(String csvSource) throws IOException, CsvValidationException {
-
-        try (InputStream csvStream = AppletTest.class.getResourceAsStream(csvSource)) {
-            assert csvStream != null;
-
-            List<byte[]> apduList = new ArrayList<>();
-            CSVReaderHeaderAware csvReader = new CSVReaderHeaderAware(new InputStreamReader(csvStream));
-            Map<String, String> values;
-
-            while ((values = csvReader.readMap()) != null) {
-                apduList.add(hashMapToApduData(values));
-            }
-
-            return apduList;
-        }
-    }
-
-    private static byte[] hashMapToApduData(Map<String, String> csvMap) {
-
-        byte[] apduData = new byte[]{
-                Constants.STATE_FALSE, Constants.STATE_FALSE, Constants.STATE_FALSE,
-                Constants.STATE_FALSE, Constants.STATE_FALSE
-        };
-
-        for (int i = 0; i < LOADED_DATA.size(); i++) {
-            if (csvMap.containsKey(LOADED_DATA.get(i))
-                    && csvMap.get(LOADED_DATA.get(i)) != null
-                    && !Objects.equals(csvMap.get(LOADED_DATA.get(i)), "")) {
-
-                if (i < 5) {
-                    apduData[i] = Constants.STATE_TRUE;
-                }
-
-                byte[] asBytes = UtilMusig.hexStringToByteArray(csvMap.get(LOADED_DATA.get(i)));
-                apduData = concatenate(apduData, asBytes);
-            }
-        }
-
-        return apduData;
-    }
-
-    // Generated by GitHub Copilot
-    private static byte[] concatenate(byte[] array1, byte[] array2) {
-        byte[] result = new byte[array1.length + array2.length];
-        System.arraycopy(array1, 0, result, 0, array1.length);
-        System.arraycopy(array2, 0, result, array1.length, array2.length);
-        return result;
-    }
-
-    private static byte[] concatenateDeter (HashMap<String, byte[]> data) {
-        byte[] dataBytes = new byte[]{};
-
-        dataBytes = concatenate(dataBytes, data.get("settings"));
-
-        if (data.get("settings")[0] == Constants.STATE_TRUE) {
-            dataBytes = concatenate(dataBytes, data.get("privateKey"));
-        }
-
-        if (data.get("settings")[1] == Constants.STATE_TRUE) {
-            dataBytes = concatenate(dataBytes, data.get("publicKey"));
-        }
-
-        if (data.get("settings")[2] == Constants.STATE_TRUE) {
-            dataBytes = concatenate(dataBytes, data.get("aggregatePublicKey"));
-        }
-
-        if (data.get("settings")[3] == Constants.STATE_TRUE) {
-            dataBytes = concatenate(dataBytes, data.get("aggnonce"));
-        }
-
-        if (data.get("settings")[4] == Constants.STATE_TRUE) {
-            dataBytes = concatenate(dataBytes, data.get("secnonce"));
-        }
-
-        return dataBytes;
     }
 }
