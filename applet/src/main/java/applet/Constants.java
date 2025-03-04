@@ -2,9 +2,6 @@ package applet;
 
 public class Constants {
 
-    // Other
-    public static final short MAX_PARTICIPATS = (short) 3; // Should be higher in the future
-
     // Settings
     //public final static short CARD_TYPE = jcmathlib.OperationSupport.SIMULATOR;
     public final static short CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71;
@@ -14,7 +11,6 @@ public class Constants {
     public static final short SHARE_LEN = (short) 32; //32
     public static final short POINT_LEN = (short) 65;
     public static final short XCORD_LEN = (short) 33;
-    public static final short MAX_PSHARE_LIST_LEN = (short) (MAX_PARTICIPATS * POINT_LEN);
     public static final short MAX_MESSAGE_LEN = (short) 255; // Still only 16 bytes instead of 32 bytes as specified in BIP
 
     // Class
@@ -53,17 +49,17 @@ public class Constants {
 
     // Generic err
     // Taken from jcfrost.Consts
-    public final static short SW_Exception = (short) 0xff01;
-    public final static short SW_ArrayIndexOutOfBoundsException = (short) 0xff02;
-    public final static short SW_ArithmeticException = (short) 0xff03;
-    public final static short SW_ArrayStoreException = (short) 0xff04;
-    public final static short SW_NullPointerException = (short) 0xff05;
-    public final static short SW_NegativeArraySizeException = (short) 0xff06;
-    public final static short SW_CryptoException_prefix = (short) 0xf100;
-    public final static short SW_SystemException_prefix = (short) 0xf200;
-    public final static short SW_PINException_prefix = (short) 0xf300;
-    public final static short SW_TransactionException_prefix = (short) 0xf400;
-    public final static short SW_CardRuntimeException_prefix = (short) 0xf500;
+    public static final short SW_Exception = (short) 0xff01;
+    public static final short SW_ArrayIndexOutOfBoundsException = (short) 0xff02;
+    public static final short SW_ArithmeticException = (short) 0xff03;
+    public static final short SW_ArrayStoreException = (short) 0xff04;
+    public static final short SW_NullPointerException = (short) 0xff05;
+    public static final short SW_NegativeArraySizeException = (short) 0xff06;
+    public static final short SW_CryptoException_prefix = (short) 0xf100;
+    public static final short SW_SystemException_prefix = (short) 0xf200;
+    public static final short SW_PINException_prefix = (short) 0xf300;
+    public static final short SW_TransactionException_prefix = (short) 0xf400;
+    public static final short SW_CardRuntimeException_prefix = (short) 0xf500;
 
     // Testing
     // IMPORTANT: Must be set to FALSE state in production

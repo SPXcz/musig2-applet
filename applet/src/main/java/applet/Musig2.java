@@ -21,6 +21,7 @@ public class Musig2 {
     private byte stateReadyForSigning; // Controls whether nonce has been already used
     private byte stateKeysEstablished; // Set to TRUE if group public key is set
     private byte stateNoncesAggregated; // Set to TRUE if nonce is aggregated
+    private byte statePreloaded; // For debug purposes. States whether data has been preloaded
 
     // Crypto arguments
     // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15) or BIP-0327
@@ -52,6 +53,7 @@ public class Musig2 {
         stateNoncesAggregated = Constants.STATE_FALSE;
         stateKeyPairGenerated = Constants.STATE_FALSE;
         stateKeysEstablished = Constants.STATE_FALSE;
+        statePreloaded = Constants.STATE_FALSE;
 
         // Main Attributes
         this.curve = curve;
@@ -119,7 +121,8 @@ public class Musig2 {
     // Nonce cant be reused
     public void nonceGen () {
 
-        if (Constants.V != 2 && Constants.V != 4) {
+        // BIP0327 supports only V=2
+        if (Constants.V != 2) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
@@ -129,7 +132,6 @@ public class Musig2 {
             pubNonce[i].multiplication(secNonce[i]);
         }
 
-        //TODO: Udelat state machine
         stateReadyForSigning = Constants.STATE_TRUE;
 
     }
@@ -139,7 +141,7 @@ public class Musig2 {
         BigNat rand = tmpBigNat;
 
         // Digest randomly generated data
-        if (Constants.DEBUG == Constants.STATE_TRUE) {
+        if (Constants.DEBUG == Constants.STATE_TRUE && statePreloaded == Constants.STATE_TRUE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
                 rand.fromByteArray(Constants.RAND_TEST, (short) 0, Constants.SHARE_LEN);
             } else {
@@ -204,7 +206,6 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
-        // TODO: Jak resit maximalni delku zpravy? (limitace JavaCard)
         if (msgLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
@@ -303,7 +304,7 @@ public class Musig2 {
     // Creates the partial signature itself
     private void signPartially () {
 
-        // TODO: Optimize?
+        // TODO: Balance branching?
         if (!coefR.isYEven()) {
             for (short i = 0; i < Constants.V; i++) {
                 tmpBigNat.copy(modulo);
@@ -332,8 +333,6 @@ public class Musig2 {
         tmpBigNat.modMult(secNonce[1], modulo);
 
         partialSig.modAdd(tmpBigNat, modulo);
-
-        // TODO: Implementovat partialSigVerify na kleintovi
     }
 
     // Format: psig
@@ -351,7 +350,7 @@ public class Musig2 {
         short length;
 
         if (cbytes) {
-            point.encode(tmpArray, (short) 0, true);  //TODO: True nebo false?
+            point.encode(tmpArray, (short) 0, true);
             length = (short) 33;
         } else {
             point.getX(tmpArray, (short) 0);
@@ -489,6 +488,7 @@ public class Musig2 {
             if (buffer[offset] == Constants.STATE_TRUE) {
                 secretShare.fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
                 currentOffset += Constants.SHARE_LEN;
+                statePreloaded = Constants.STATE_TRUE;
             }
 
             // Public key
@@ -496,6 +496,7 @@ public class Musig2 {
                 publicShare.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 currentOffset += Constants.XCORD_LEN;
                 stateKeyPairGenerated = Constants.STATE_TRUE;
+                statePreloaded = Constants.STATE_TRUE;
             }
 
             // Group public key
@@ -503,6 +504,7 @@ public class Musig2 {
                 groupPubKey.decode(buffer, currentOffset, Constants.XCORD_LEN);
                 stateKeysEstablished = Constants.STATE_TRUE;
                 currentOffset += Constants.XCORD_LEN;
+                statePreloaded = Constants.STATE_TRUE;
             }
 
             // Aggregated nonce
@@ -523,6 +525,7 @@ public class Musig2 {
                 currentOffset += Constants.XCORD_LEN;
                 stateNoncesAggregated = Constants.STATE_TRUE;
                 stateReadyForSigning = Constants.STATE_TRUE;
+                statePreloaded = Constants.STATE_TRUE;
             }
 
             // Secnonce
@@ -532,6 +535,7 @@ public class Musig2 {
                 secNonce[1].fromByteArray(buffer, currentOffset, Constants.SHARE_LEN);
                 currentOffset += Constants.SHARE_LEN;
                 currentOffset += Constants.XCORD_LEN; // Also includes PK for some reason
+                statePreloaded = Constants.STATE_TRUE;
             }
 
             return currentOffset;
@@ -542,6 +546,7 @@ public class Musig2 {
         stateReadyForSigning = Constants.STATE_FALSE;
         stateKeysEstablished = Constants.STATE_FALSE;
         stateNoncesAggregated = Constants.STATE_FALSE;
+        statePreloaded = Constants.STATE_FALSE;
     }
 
     public void dereference() {
