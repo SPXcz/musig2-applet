@@ -1,7 +1,6 @@
 package applet;
 
 import javacard.framework.*;
-import javacard.security.CryptoException;
 import javacard.security.RandomData;
 import applet.jcmathlib.*;
 
