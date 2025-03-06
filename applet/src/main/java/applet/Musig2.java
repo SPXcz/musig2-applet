@@ -24,6 +24,7 @@ public class Musig2 {
 
     // Crypto arguments
     // Argument names refer to the names of arguments in the founding MuSig 2 paper (p. 15) or BIP-0327
+    // https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki
     // https://eprint.iacr.org/2020/1261.pdf
     private ECCurve curve;
     private ECPoint publicShare;
@@ -215,12 +216,12 @@ public class Musig2 {
 //            return (short) -1;
 //        }
 
-        if ((short) (inOffset + msgLength) > (short) messageBuffer.length) {
+        if ((short) (inOffset + msgLength) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
 
-        if ((short) (outOffset + Constants.XCORD_LEN + Constants.SHARE_LEN) > (short) outBuffer.length) {
+        if ((short) (outOffset + Constants.XCORD_LEN + Constants.SHARE_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
         }
@@ -279,7 +280,6 @@ public class Musig2 {
         // Initalize R using R1
         coefR.copy(aggNonce[1]);
 
-        // Optimized operation for V = 2
         coefR.multAndAdd(coefB, aggNonce[0]);
     }
 
@@ -324,7 +324,6 @@ public class Musig2 {
             partialSig.modNegate(modulo);
         }
 
-        //partialSig.modMult(gacc, modulo); // Needs to be uncommented when implementing tweaks
         partialSig.modMult(secretShare, modulo);
         partialSig.modAdd(secNonce[0], modulo);
 
@@ -337,7 +336,7 @@ public class Musig2 {
     // Format: psig
     private void writePartialSignatureOut (byte[] outbuffer, short offset) {
 
-        if ((short) (offset + Constants.SHARE_LEN) > (short) outbuffer.length) {
+        if ((short) (offset + Constants.SHARE_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
@@ -381,7 +380,7 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
-        if ((short)(offset + Constants.XCORD_LEN) > (short) buffer.length) {
+        if ((short)(offset + Constants.XCORD_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
@@ -398,7 +397,7 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
-        if ((short)(offset + Constants.XCORD_LEN) > (short) buffer.length) {
+        if ((short)(offset + Constants.XCORD_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
@@ -417,7 +416,7 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        if ((short)(offset + Constants.XCORD_LEN * Constants.V) > (short) buffer.length) {
+        if ((short)(offset + Constants.XCORD_LEN * Constants.V) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
@@ -433,7 +432,7 @@ public class Musig2 {
     // Public key, coefA (33+32)
     public void setGroupPubKey (byte[] firstRoundData, short offset) {
 
-        if ((short)(offset + Constants.XCORD_LEN + Constants.SHARE_LEN) > (short) firstRoundData.length) {
+        if ((short)(offset + Constants.XCORD_LEN + Constants.SHARE_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 
@@ -450,7 +449,7 @@ public class Musig2 {
 
         short currentOffset = offset;
 
-        if ((short)(offset + 2 * Constants.XCORD_LEN) > (short) nonces.length) {
+        if ((short)(offset + 2 * Constants.XCORD_LEN) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
         }
 

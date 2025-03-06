@@ -37,6 +37,8 @@ public abstract class MusigTest extends BaseTest {
 
         String perfFileName = "sign_perf_result.csv";
         PrintWriter filePerfOut = new PrintWriter(new FileWriter(perfFileName, false));
+        filePerfOut.printf("Execution time, secret share, secnonce");
+
         List<byte[]> setUpTestData = UtilMusig.csvToApdus(csvSource, MusigTest.class);
         List<byte[]> signatures = UtilMusig.individualColumn(csvSource, "expectedSignature");
         assert setUpTestData.size() == signatures.size();
@@ -66,10 +68,6 @@ public abstract class MusigTest extends BaseTest {
             cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
             responseAPDUSetUp = connect().transmit(cmdSetUp);
 
-            if (performanceTest) {
-                filePerfOut.printf("%d,", statefulCard.getLastTransmitTime());
-            }
-
             Assert.assertNotNull(responseAPDUSetUp);
             Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
 
@@ -78,7 +76,7 @@ public abstract class MusigTest extends BaseTest {
 
             if (performanceTest) {
                 Long transmitTime = statefulCard.getLastTransmitTime();
-                filePerfOut.printf("%d\n", transmitTime);
+                filePerfOut.printf("%d%n", transmitTime);
             }
 
             Assert.assertNotNull(responseAPDU);

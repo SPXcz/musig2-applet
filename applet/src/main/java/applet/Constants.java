@@ -11,7 +11,8 @@ public class Constants {
     public static final short SHARE_LEN = (short) 32; //32
     public static final short POINT_LEN = (short) 65;
     public static final short XCORD_LEN = (short) 33;
-    public static final short MAX_MESSAGE_LEN = (short) 255; // Still only 16 bytes instead of 32 bytes as specified in BIP
+    public static final short MAX_MESSAGE_LEN = (short) 999999; //255; // Still only 16 bytes instead of 32 bytes as specified in BIP
+    public static final short MAX_JC_BUFFER_LEN = (short) 32766;
 
     // Class
     public static final byte CLA_MUSIG2 = (byte) 0xA6;

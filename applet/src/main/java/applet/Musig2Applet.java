@@ -4,8 +4,9 @@ import javacard.framework.*;
 import applet.jcmathlib.*;
 import applet.jcmathlib.SecP256k1;
 import javacard.security.CryptoException;
+import javacardx.apdu.ExtendedLength;
 
-public class Musig2Applet extends Applet implements AppletEvent {
+public class Musig2Applet extends Applet implements AppletEvent, ExtendedLength {
 
     /**
      * Noncompliance with BIP0327:
@@ -17,6 +18,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
     // Utils
     private boolean initialized = false;
     private ResourceManager rm;
+    private byte[] largeBuffer;
 
     // Crypto args
     private ECCurve curve;
@@ -40,6 +42,7 @@ public class Musig2Applet extends Applet implements AppletEvent {
         }
 
         try {
+            largeBuffer = new byte[Constants.MAX_JC_BUFFER_LEN];
             rm = new ResourceManager(Constants.FULL_LEN);
             curve = new ECCurve(SecP256k1.p, SecP256k1.a, SecP256k1.b, SecP256k1.G, SecP256k1.r, rm);
             rm.fixModSqMod(curve.rBN);
@@ -75,7 +78,8 @@ public class Musig2Applet extends Applet implements AppletEvent {
     }
 
     public void generateKeys (APDU apdu) {
-        musig2.individualPubkey(apdu.getBuffer(), ISO7816.OFFSET_CDATA);
+        byte[] apduBuffer = loadApdu(apdu);
+        musig2.individualPubkey(apduBuffer, apdu.getOffsetCdata());
 
         ISOException.throwIt(ISO7816.SW_NO_ERROR);
     }
@@ -85,55 +89,59 @@ public class Musig2Applet extends Applet implements AppletEvent {
     }
 
     private void getXonlyPubkey (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        musig2.getXonlyPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
+        byte[] apduBuffer = loadApdu(apdu);
+        short offsetData = apdu.getOffsetCdata();
+        musig2.getXonlyPubKey(apduBuffer, offsetData);
 
         apdu.setOutgoing();
         apdu.setOutgoingLength((short) (Constants.XCORD_LEN - 1));
-        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, (short) (Constants.XCORD_LEN - 1));
+        apdu.sendBytesLong(apduBuffer, offsetData, (short) (Constants.XCORD_LEN - 1));
     }
 
     private void getPlainPubkey (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        musig2.getPlainPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
+        byte[] apduBuffer = loadApdu(apdu);
+        short offsetData = apdu.getOffsetCdata();
+        musig2.getPlainPubKey(apduBuffer, offsetData);
 
         apdu.setOutgoing();
         apdu.setOutgoingLength(Constants.XCORD_LEN);
-        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, Constants.XCORD_LEN);
+        apdu.sendBytesLong(apduBuffer, offsetData, Constants.XCORD_LEN);
     }
 
     private void getPublicNonceShare (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        musig2.getPublicNonceShare(apduBuffer, ISO7816.OFFSET_CDATA);
+        byte[] apduBuffer = loadApdu(apdu);
+        short offsetData = apdu.getOffsetCdata();
+        musig2.getPublicNonceShare(apduBuffer, offsetData);
 
         apdu.setOutgoing();
         apdu.setOutgoingLength((short) (Constants.POINT_LEN * Constants.V));
-        apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, (short) (Constants.XCORD_LEN * Constants.V));
+        apdu.sendBytesLong(apduBuffer, offsetData, (short) (Constants.XCORD_LEN * Constants.V));
     }
 
     private void setAggPubKey (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
+        byte[] apduBuffer = loadApdu(apdu);
 
-        musig2.setGroupPubKey(apduBuffer, ISO7816.OFFSET_CDATA);
+        musig2.setGroupPubKey(apduBuffer, apdu.getOffsetCdata());
     }
 
     private void setPublicNonce (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        musig2.setNonceAggregate(apduBuffer, ISO7816.OFFSET_CDATA);
+        byte[] apduBuffer = loadApdu(apdu);
+        musig2.setNonceAggregate(apduBuffer, apdu.getOffsetCdata());
     }
 
     private void sign (APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        short inLen = (short) (apduBuffer[ISO7816.OFFSET_LC] & 0xFF);
+        byte[] apduBuffer = loadApdu(apdu);
+        short offsetData = apdu.getOffsetCdata();
+        short inLen = apdu.getIncomingLength();
         short outLen = musig2.sign(apduBuffer,
-                ISO7816.OFFSET_CDATA,
+                offsetData,
                 inLen,
                 apduBuffer,
-                ISO7816.OFFSET_CDATA);
+                offsetData);
         try {
             apdu.setOutgoing();
             apdu.setOutgoingLength(outLen);
-            apdu.sendBytesLong(apduBuffer, ISO7816.OFFSET_CDATA, outLen);
+            apdu.sendBytesLong(apduBuffer, offsetData, outLen);
         } catch (CryptoException e) {
             ISOException.throwIt(Constants.E_CRYPTO_EXCEPTION);
         } catch (APDUException e) {
@@ -147,8 +155,8 @@ public class Musig2Applet extends Applet implements AppletEvent {
     }
 
     private void setUpTestData(APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        short inOffset = ISO7816.OFFSET_CDATA;
+        byte[] apduBuffer = loadApdu(apdu);
+        short inOffset = apdu.getOffsetCdata();
 
         if (Constants.DEBUG == Constants.STATE_TRUE) {
             if (Constants.DEBUG != Constants.STATE_FALSE) {
@@ -252,5 +260,22 @@ public class Musig2Applet extends Applet implements AppletEvent {
         initialized = false;
         curve = null;
         rm = null;
+    }
+
+    // Taken from JC2pECDSA repository
+    // https://github.com/crocs-muni/JC2pECDSA
+    private byte[] loadApdu(APDU apdu) {
+        byte[] apduBuffer = apdu.getBuffer();
+        short recvLen = (short) (apdu.setIncomingAndReceive() + apdu.getOffsetCdata());
+        if (apdu.getOffsetCdata() == ISO7816.OFFSET_CDATA) {
+            return apduBuffer;
+        }
+        short written = 0;
+        while (recvLen > 0) {
+            Util.arrayCopyNonAtomic(apduBuffer, (short) 0, largeBuffer, written, recvLen);
+            written += recvLen;
+            recvLen = apdu.receiveBytes((short) 0);
+        }
+        return largeBuffer;
     }
 }
