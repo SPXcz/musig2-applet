@@ -37,7 +37,6 @@ public abstract class MusigTest extends BaseTest {
 
         String perfFileName = "sign_perf_result.csv";
         PrintWriter filePerfOut = new PrintWriter(new FileWriter(perfFileName, false));
-        filePerfOut.printf("Execution time, secret share, secnonce");
 
         List<byte[]> setUpTestData = UtilMusig.csvToApdus(csvSource, MusigTest.class);
         List<byte[]> signatures = UtilMusig.individualColumn(csvSource, "expectedSignature");

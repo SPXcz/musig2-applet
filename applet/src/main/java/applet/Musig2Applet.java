@@ -167,6 +167,7 @@ public class Musig2Applet extends Applet implements AppletEvent, ExtendedLength 
         }
     }
 
+    @Override
     public boolean select() {
         if(initialized) {
             curve.updateAfterReset();

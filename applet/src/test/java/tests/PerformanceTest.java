@@ -33,13 +33,6 @@ public class PerformanceTest extends MusigTest {
         setSimulateStateful(true);
     }
 
-    public void reset () throws Exception {
-        final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_RESET, 0, 0);
-        final ResponseAPDU responseAPDU = connect().transmit(cmd);
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-    }
-
     @BeforeEach
     public void setUpMethod() throws Exception {
         reset();
@@ -73,7 +66,7 @@ public class PerformanceTest extends MusigTest {
             final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0);
             final ResponseAPDU responseAPDU = connect().transmit(cmd);
             Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-            file.printf("%d\n", statefulCard.getLastTransmitTime());
+            file.printf("%d%n", statefulCard.getLastTransmitTime());
         }
         file.close();
     }
@@ -102,7 +95,7 @@ public class PerformanceTest extends MusigTest {
             Assert.assertNotNull(responseAPDU2);
             Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
 
-            file.printf("%d\n", statefulCard.getLastTransmitTime());
+            file.printf("%d%n", statefulCard.getLastTransmitTime());
         }
         file.close();
     }

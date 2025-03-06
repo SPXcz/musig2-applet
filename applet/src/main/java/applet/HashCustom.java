@@ -61,7 +61,6 @@ public class HashCustom {
         }
 
         digest.doFinal(inBuffer, offset, length, outBuffer, outOffset);
-        //digest.reset();
         firstDigest = true;
     }
 }

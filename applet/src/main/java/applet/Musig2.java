@@ -211,11 +211,6 @@ public class Musig2 {
             return (short) -1;
         }
 
-//        if (msgLength <= 0) {
-//            ISOException.throwIt(Constants.E_NO_MESSAGE);
-//            return (short) -1;
-//        }
-
         if ((short) (inOffset + msgLength) > Constants.MAX_JC_BUFFER_LEN) {
             ISOException.throwIt(Constants.E_BUFFER_OVERLOW);
             return (short) -1;
@@ -303,7 +298,6 @@ public class Musig2 {
     // Creates the partial signature itself
     private void signPartially () {
 
-        // TODO: Balance branching?
         if (!coefR.isYEven()) {
             for (short i = 0; i < Constants.V; i++) {
                 tmpBigNat.copy(modulo);
@@ -437,8 +431,6 @@ public class Musig2 {
         }
 
         this.groupPubKey.decode(firstRoundData, offset, Constants.XCORD_LEN);
-        //gacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
-        //tacc.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN + Constants.SHARE_LEN), Constants.SHARE_LEN);
         coefA.fromByteArray(firstRoundData, (short) (offset + Constants.XCORD_LEN), Constants.SHARE_LEN);
 
         stateKeysEstablished = Constants.STATE_TRUE;
