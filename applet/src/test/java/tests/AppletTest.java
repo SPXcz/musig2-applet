@@ -15,6 +15,7 @@ import java.util.*;
  * @author xsvenda, Dusan Klinec (ph4r05)
  */
 
+@Tag("unit")
 public class AppletTest extends MusigTest {
 
     @BeforeEach

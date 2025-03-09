@@ -95,19 +95,22 @@ application {
 
 
 test {
-    // useTestNG()
-    useJUnitPlatform {
-        // excludeTags 'manual'
-        // excludeClassNamePatterns '.**/*AppletTest'
+
+    task unitTests(type: Test) {
+        useJUnitPlatform {
+            includeTags 'unit'
+        }
     }
 
-    task manualTests(type: Test) {
+    task performanceTests(type: Test) {
         useJUnitPlatform {
-            includeTags 'manual'
+            includeTags 'performance'
         }
-        check.dependsOn it
-        shouldRunAfter test
+       // check.dependsOn it
+       // shouldRunAfter test
     }
+
+
 }
 
 // JavaCard SDKs and libraries

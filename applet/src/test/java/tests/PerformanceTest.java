@@ -20,6 +20,7 @@ import javax.smartcardio.ResponseAPDU;
  * <p>
  * GitHub: <a href="https://github.com/crocs-muni/JCMint">JCMint</a>
  */
+@Tag("performance")
 public class PerformanceTest extends MusigTest {
     private final long REPEAT = 100;
 
