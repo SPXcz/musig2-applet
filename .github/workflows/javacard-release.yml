@@ -52,9 +52,13 @@ jobs:
       - name: Build JavaCard applet with Gradle Wrapper
         run: ./gradlew buildJavaCard
 
-      - name: Upload CAP artifact
+      - name: Check if build exists
+        run: |
+          [ -e applet/build/javacard/applet.cap ] || exit 1
+
+      - name: Upload Musig2JC applet artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Musig2JC Applet
+          name: applet.cap
           path:
-            build/javacard/applet.cap
+            applet/build/javacard
