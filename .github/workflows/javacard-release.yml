@@ -1,0 +1,33 @@
+# Manual applet release
+
+name: Manual applet release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Tag name for the release
+        required: true
+      release_name:
+        description: Release name
+        required: true
+
+jobs:
+  build:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create Release
+        id: create_release
+        uses: comnoco/create-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          release_name: Release ${{ inputs.release_name }}
+          body: |
+            Release description
+          draft: true
+          prerelease: false
