@@ -29,10 +29,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: ${{ inputs.tag_name }}
+          label: ${{ inputs.release_name }}
           tag_name: ${{ inputs.tag_name }}
           release_name: Release ${{ inputs.release_name }}
           body: ${{ inputs.release_description }}
-          draft: true
+          draft: false
           prerelease: false
 
       - name: Check out repo
@@ -49,7 +51,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
-      - name: Build JavaCard applet with Gradle Wrapper
+      - name: Build JavaCard applet
         run: ./gradlew buildJavaCard
 
       - name: Check if build exists
@@ -63,7 +65,7 @@ jobs:
           path:
             applet/build/javacard/applet.cap
 
-      - name: Upload Musig2JC applet artifact
+      - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
