@@ -52,7 +52,7 @@ jobs:
         uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
       - name: Set production variables
-        uses: |
+        run: |
           sed -i -e 's/DEBUG = Constants.STATE_TRUE/DEBUG = Constants.STATE_FALSE/' applet/src/main/java/applet/Constants.java &&
           sed -i -e 's/CARD_TYPE = jcmathlib.OperationSupport.SIMULATOR/CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71/' \
           applet/src/main/java/applet/Constants.java
