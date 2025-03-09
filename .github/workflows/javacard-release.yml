@@ -53,9 +53,11 @@ jobs:
 
       - name: Set production variables
         run: |
-          sed -i -e 's/DEBUG = Constants.STATE_TRUE/DEBUG = Constants.STATE_FALSE/' applet/src/main/java/applet/Constants.java &&
+          CONSTANTS_LOCATION=applet/src/main/java/applet/Constants.java && \
+          [ -e $CONSTANTS_LOCATION ] || exit 1 && \
+          sed -i -e 's/DEBUG = Constants.STATE_TRUE/DEBUG = Constants.STATE_FALSE/' $CONSTANTS_LOCATION && \
           sed -i -e 's/CARD_TYPE = jcmathlib.OperationSupport.SIMULATOR/CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71/' \
-          applet/src/main/java/applet/Constants.java
+          $CONSTANTS_LOCATION
 
       - name: Build JavaCard applet
         run: ./gradlew buildJavaCard
@@ -79,5 +81,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./applet/build/javacard/applet.cap
-          asset_name: applet.cap
+          asset_name: applet
           asset_content_type: application/java-archive
