@@ -89,9 +89,6 @@ task dumpClassPath(dependsOn: ['idea']) {
     }
 }
 
-application {
-    mainClass = 'main.ClientApp'
-}
 
 
 test {
@@ -106,8 +103,6 @@ test {
         useJUnitPlatform {
             includeTags 'performance'
         }
-       // check.dependsOn it
-       // shouldRunAfter test
     }
 
 
@@ -132,6 +127,7 @@ final def JC310b43 = libsSdk + '/jc310b43_kit'
 // JC310b43 supports building also for lower versions (cap.targetsdk).
 // If another SDK is selected, please comment the cap.targetsdk setting.
 final def JC_SELECTED = JC310b43
+
 
 javacard {
 

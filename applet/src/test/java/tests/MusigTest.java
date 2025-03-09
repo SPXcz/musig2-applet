@@ -16,12 +16,13 @@ public abstract class MusigTest extends BaseTest {
 
     public MusigTest() {
 
-        // Change card type in
-        if (Constants.CARD_TYPE == jcmathlib.OperationSupport.JCOP4_P71) {
-            setCardType(CardType.PHYSICAL);
-        } else if (Constants.CARD_TYPE == jcmathlib.OperationSupport.SIMULATOR) {
-            setCardType(CardType.JCARDSIMLOCAL);
-        }
+
+
+//        if (Constants.CARD_TYPE == jcmathlib.OperationSupport.JCOP4_P71) {
+//            setCardType(CardType.PHYSICAL);
+//        } else if (Constants.CARD_TYPE == jcmathlib.OperationSupport.SIMULATOR) {
+//            setCardType(CardType.JCARDSIMLOCAL);
+//        }
         setSimulateStateful(true);
     }
 
