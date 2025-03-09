@@ -3,7 +3,7 @@
 Musig2JC is a [BIP-0327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki) compliant Java Card 
 implementation of a multi-signature scheme called [MuSig2](https://eprint.iacr.org/2020/1261). It is natively supported by [Meesign](https://meesign.crocs.fi.muni.cz/)
 message signing app but can be implemented into other systems which benefit from properties of multi-signatures 
-(e.g. crypto wallets, PDF viewers, banking applications, ERPs, ...) or in systems where a redundancy of private keys is needed for security purposes.
+(e.g. crypto wallets, PDF viewers, banking applications, ...) or in systems where a redundancy of private keys is needed for security purposes.
 Musig2JC does not support tweaking.
 
 ## Multi-signature

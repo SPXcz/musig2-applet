@@ -32,7 +32,7 @@ jobs:
           name: ${{ inputs.tag_name }}
           label: ${{ inputs.release_name }}
           tag_name: ${{ inputs.tag_name }}
-          release_name: Release ${{ inputs.release_name }}
+          release_name: ${{ inputs.release_name }}
           body: ${{ inputs.release_description }}
           draft: false
           prerelease: false
