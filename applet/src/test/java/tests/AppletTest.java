@@ -4,7 +4,6 @@ import applet.Constants;
 import org.junit.jupiter.api.*;
 import org.testng.Assert;
 
-import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 import java.util.*;
 
@@ -31,10 +30,8 @@ public class AppletTest extends MusigTest {
     // Sanity check
     @Test
     public void testKeygenExecutes() throws Exception {
-        final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0);
-        final ResponseAPDU responseAPDU = connect().transmit(cmd);
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+        final ResponseAPDU responseAPDU = sendCorrectApdu(Constants.INS_GENERATE_KEYS, null);
         Assert.assertNotNull(responseAPDU.getBytes());
     }
 
@@ -50,25 +47,11 @@ public class AppletTest extends MusigTest {
 
         byte[] dataBytes = UtilMusig.concatenateDeter(data);
 
-        CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, dataBytes);
-        ResponseAPDU responseAPDU = connect().transmit(cmd);
+        sendCorrectApdu(Constants.INS_SETUP_TEST_DATA, dataBytes);
+        sendCorrectApdu(Constants.INS_GENERATE_NONCES, null);
+        ResponseAPDU responseAPDU = sendCorrectApdu(Constants.INS_GET_PNONCE_SHARE, null);
 
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-        cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0);
-        responseAPDU = connect().transmit(cmd);
-
-        Assert.assertNotNull(responseAPDU);
-        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-        CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
-        ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-
-        Assert.assertNotNull(responseAPDU2);
-        Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
-
-        byte[] pubNonce = responseAPDU2.getData();
+        byte[] pubNonce = responseAPDU.getData();
 
         Assert.assertEquals(pubNonce, data.get("expectedPubNonce"));
     }
@@ -81,17 +64,10 @@ public class AppletTest extends MusigTest {
         assert apduDataArray.size() == pks.size();
 
         for (int i = 0; i < apduDataArray.size(); i++) {
-            final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0, apduDataArray.get(i));
-            final ResponseAPDU responseAPDU = connect().transmit(cmd);
-            Assert.assertNotNull(responseAPDU);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
 
-            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PLAIN_PUBKEY, 0, 0);
-            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-
-            Assert.assertNotNull(responseAPDU2);
-            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
-            Assert.assertEquals(responseAPDU2.getData(), pks.get(i));
+            sendCorrectApdu(Constants.INS_GENERATE_KEYS, apduDataArray.get(i));
+            ResponseAPDU responseAPDU = sendCorrectApdu(Constants.INS_GET_PLAIN_PUBKEY, null);
+            Assert.assertEquals(responseAPDU.getData(), pks.get(i));
             reset();
         }
     }
@@ -105,25 +81,11 @@ public class AppletTest extends MusigTest {
 
         for (int i = 0; i < apduDataArray.size(); i++) {
 
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, apduDataArray.get(i));
-            ResponseAPDU responseAPDU = connect().transmit(cmd);
+            sendCorrectApdu(Constants.INS_SETUP_TEST_DATA, apduDataArray.get(i));
+            sendCorrectApdu(Constants.INS_GENERATE_NONCES, null);
+            ResponseAPDU responseAPDU = sendCorrectApdu(Constants.INS_GET_PNONCE_SHARE, null);
 
-            Assert.assertNotNull(responseAPDU);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-            cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0);
-            responseAPDU = connect().transmit(cmd);
-
-            Assert.assertNotNull(responseAPDU);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
-            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-
-            Assert.assertNotNull(responseAPDU2);
-            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
-
-            byte[] pubNonce = responseAPDU2.getData();
+            byte[] pubNonce = responseAPDU.getData();
 
             Assert.assertEquals(pubNonce, pubnonces.get(i));
             reset();
@@ -159,12 +121,8 @@ public class AppletTest extends MusigTest {
         assert setUpTestData.size() == coefAs.size();
 
         for (byte[] setUpTestDatum : setUpTestData) {
-
-            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, setUpTestDatum);
-            ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
-
-            Assert.assertNotNull(responseAPDUSetUp);
-            Assert.assertNotEquals(responseAPDUSetUp.getSW(), 0x9000);
+            ResponseAPDU responseAPDU = sendMusigApdu(Constants.INS_SETUP_TEST_DATA, setUpTestDatum);
+            Assert.assertNotEquals(responseAPDU.getSW(), 0x9000);
         }
     }
 }

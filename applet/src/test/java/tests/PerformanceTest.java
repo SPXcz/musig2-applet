@@ -64,9 +64,7 @@ public class PerformanceTest extends MusigTest {
         PrintWriter file = new PrintWriter(new FileWriter(fileName, false));
 
         for (int i = 0; i < REPEAT; ++i) {
-            final CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_KEYS, 0, 0);
-            final ResponseAPDU responseAPDU = connect().transmit(cmd);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+            sendCorrectApdu(Constants.INS_GENERATE_KEYS, null);
             file.printf("%d%n", statefulCard.getLastTransmitTime());
         }
         file.close();
@@ -79,23 +77,11 @@ public class PerformanceTest extends MusigTest {
         PrintWriter file = new PrintWriter(new FileWriter(fileName, false));
 
         for (byte[] apduSetupData : apduDataArray) {
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, apduSetupData);
-            ResponseAPDU responseAPDU = connect().transmit(cmd);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-
-            cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GENERATE_NONCES, 0, 0);
-            responseAPDU = connect().transmit(cmd);
-
-            Assert.assertNotNull(responseAPDU);
-            Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+            sendCorrectApdu(Constants.INS_SETUP_TEST_DATA, apduSetupData);
+            sendCorrectApdu(Constants.INS_GENERATE_NONCES, null);
             file.printf("%d,", statefulCard.getLastTransmitTime());
 
-            CommandAPDU cmd2 = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_GET_PNONCE_SHARE, 0, 0);
-            ResponseAPDU responseAPDU2 = connect().transmit(cmd2);
-
-            Assert.assertNotNull(responseAPDU2);
-            Assert.assertEquals(responseAPDU2.getSW(), 0x9000);
-
+            sendCorrectApdu(Constants.INS_GET_PNONCE_SHARE, null);
             file.printf("%d%n", statefulCard.getLastTransmitTime());
         }
         file.close();

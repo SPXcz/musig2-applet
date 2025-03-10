@@ -16,13 +16,11 @@ public abstract class MusigTest extends BaseTest {
 
     public MusigTest() {
 
-
-
-//        if (Constants.CARD_TYPE == jcmathlib.OperationSupport.JCOP4_P71) {
-//            setCardType(CardType.PHYSICAL);
-//        } else if (Constants.CARD_TYPE == jcmathlib.OperationSupport.SIMULATOR) {
-//            setCardType(CardType.JCARDSIMLOCAL);
-//        }
+        if (Constants.CARD_TYPE == jcmathlib.OperationSupport.JCOP4_P71) {
+            setCardType(CardType.PHYSICAL);
+        } else if (Constants.CARD_TYPE == jcmathlib.OperationSupport.SIMULATOR) {
+            setCardType(CardType.JCARDSIMLOCAL);
+        }
         setSimulateStateful(true);
     }
 
@@ -59,42 +57,57 @@ public abstract class MusigTest extends BaseTest {
 
         for (int i = 0; i < setUpTestData.size(); i++) {
 
-            CommandAPDU cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SETUP_TEST_DATA, 0, 0, setUpTestData.get(i));
-            ResponseAPDU responseAPDUSetUp = connect().transmit(cmdSetUp);
+            ResponseAPDU signResponse;
 
-            Assert.assertNotNull(responseAPDUSetUp);
-            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
+            sendCorrectApdu(Constants.INS_SETUP_TEST_DATA, setUpTestData.get(i));
+            sendCorrectApdu(Constants.INS_SET_AGG_PUBKEY, firstRoundData.get(i));
 
-            cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SET_AGG_PUBKEY, 0, 0, firstRoundData.get(i));
-            responseAPDUSetUp = connect().transmit(cmdSetUp);
-
-            Assert.assertNotNull(responseAPDUSetUp);
-            Assert.assertEquals(responseAPDUSetUp.getSW(), 0x9000);
-
-            CommandAPDU cmd = new CommandAPDU(Constants.CLA_MUSIG2, Constants.INS_SIGN, 0, 0, messages.get(i));
-            ResponseAPDU responseAPDU = connect().transmit(cmd);
+            if (fail) {
+                if (i == 0) {
+                    signResponse = sendMusigApdu(Constants.INS_SIGN, messages.get(i));
+                    Assert.assertNotEquals(signResponse.getSW(), 0x9000);
+                } else {
+                    signResponse = sendMusigApdu(Constants.INS_SIGN, messages.get(i));
+                    Assert.assertEquals(signResponse.getSW(), 0x9000);
+                    Assert.assertNotEquals(signResponse.getData(), signatures.get(i));
+                }
+            } else {
+                signResponse = sendCorrectApdu(Constants.INS_SIGN, messages.get(i));
+                Assert.assertEquals(signResponse.getData(), signatures.get(i));
+            }
 
             if (performanceTest) {
                 Long transmitTime = statefulCard.getLastTransmitTime();
                 filePerfOut.printf("%d%n", transmitTime);
             }
 
-            Assert.assertNotNull(responseAPDU);
-
-            if (fail) {
-                if (i == 0) {
-                    Assert.assertNotEquals(responseAPDU.getSW(), 0x9000);
-                } else {
-                    Assert.assertNotEquals(responseAPDU.getData(), signatures.get(i));
-                }
-            } else {
-                Assert.assertEquals(responseAPDU.getSW(), 0x9000);
-                Assert.assertEquals(responseAPDU.getData(), signatures.get(i));
-            }
-
             reset();
         }
 
         filePerfOut.close();
+    }
+
+    protected ResponseAPDU sendCorrectApdu (byte ins, byte[] payload) throws Exception {
+        ResponseAPDU responseAPDU = sendMusigApdu(ins, payload);
+        Assert.assertEquals(responseAPDU.getSW(), 0x9000);
+
+        return responseAPDU;
+    }
+
+    protected ResponseAPDU sendMusigApdu (byte ins, byte[] payload) throws Exception {
+
+        CommandAPDU cmdSetUp;
+
+        if (payload == null) {
+            cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, ins, 0, 0);
+        } else {
+            cmdSetUp = new CommandAPDU(Constants.CLA_MUSIG2, ins, 0, 0, payload);
+        }
+
+        ResponseAPDU responseAPDU = connect().transmit(cmdSetUp);
+
+        Assert.assertNotNull(responseAPDU);
+
+        return responseAPDU;
     }
 }
