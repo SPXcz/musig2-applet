@@ -4,7 +4,7 @@ public class Constants {
 
     // Settings
     public final static short CARD_TYPE = jcmathlib.OperationSupport.SIMULATOR;
-    //public final static short CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71;
+//    public final static short CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71;
     public static final short V = (short) 2; // Musig 2 attribute. Either 2 or 4. V = 4 currently isn't fully supported.
     public static final short FULL_LEN = (short) 256;
     public static final short HASH_LEN = (short) 32;

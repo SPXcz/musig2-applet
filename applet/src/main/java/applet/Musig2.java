@@ -121,6 +121,10 @@ public class Musig2 {
     // Nonce cant be reused
     public void nonceGen () {
 
+        if (stateKeyPairGenerated != Constants.STATE_TRUE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
         // BIP0327 supports only V=2
         if (Constants.V != 2) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -198,11 +202,11 @@ public class Musig2 {
                       byte[] outBuffer,
                       short outOffset) {
 
-        if (stateReadyForSigning == Constants.STATE_FALSE) {
+        if (stateReadyForSigning != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        if (stateNoncesAggregated == Constants.STATE_FALSE) {
+        if (stateNoncesAggregated != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
@@ -237,13 +241,14 @@ public class Musig2 {
         eraseNonce();
 
         stateReadyForSigning = Constants.STATE_FALSE;
+        stateNoncesAggregated = Constants.STATE_FALSE;
 
         return modulo.length();
     }
 
     private void generateCoefB (byte[] messageBuffer, short offset, short length) {
 
-        if (stateNoncesAggregated == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
+        if (stateNoncesAggregated != Constants.STATE_TRUE || stateKeysEstablished != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             return;
         }
@@ -267,7 +272,7 @@ public class Musig2 {
 
     private void generateCoefR () {
 
-        if (stateNoncesAggregated == Constants.STATE_FALSE) {
+        if (stateNoncesAggregated != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             return;
         }
@@ -280,7 +285,7 @@ public class Musig2 {
 
     private void generateChallengeE (byte[] messageBuffer, short offset, short length) {
 
-        if (stateNoncesAggregated == Constants.STATE_FALSE || stateKeysEstablished == Constants.STATE_FALSE) {
+        if (stateNoncesAggregated != Constants.STATE_TRUE || stateKeysEstablished != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             return;
         }
@@ -370,7 +375,7 @@ public class Musig2 {
     // Bitcoin public key format
     public void getXonlyPubKey(byte[] buffer, short offset) {
 
-        if (stateKeyPairGenerated == Constants.STATE_FALSE) {
+        if (stateKeyPairGenerated != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
@@ -387,7 +392,7 @@ public class Musig2 {
 
     public void getPlainPubKey (byte[] buffer, short offset) {
 
-        if (stateKeyPairGenerated == Constants.STATE_FALSE) {
+        if (stateKeyPairGenerated != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
@@ -406,7 +411,7 @@ public class Musig2 {
     public void getPublicNonceShare (byte[] buffer, short offset) {
 
         // Is nonce generated?
-        if (stateReadyForSigning == Constants.STATE_FALSE) {
+        if (stateReadyForSigning != Constants.STATE_TRUE) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
