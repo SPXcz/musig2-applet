@@ -1,3 +1,6 @@
 [submodule "libs-sdks"]
 	path = libs-sdks
 	url = https://github.com/martinpaljak/oracle_javacard_sdks.git
+[submodule "musig2_test_gen"]
+    path = musig2_test_gen
+    url = https://github.com/SPXcz/musig2_test_gen.git
