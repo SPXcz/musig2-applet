@@ -35,7 +35,7 @@ public class Musig2 {
     private BigNat secretShare;
     private BigNat coefA;
     private BigNat coefB; // Temporary attribute
-    private BigNat challangeE;
+    private BigNat challengeE;
     private BigNat partialSig;
     private BigNat modulo;
     private BigNat[] secNonce;
@@ -66,7 +66,7 @@ public class Musig2 {
 
         coefA = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         coefB = new BigNat(Constants.HASH_LEN, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
-        challangeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
+        challengeE = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
 
         partialSig = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_PERSISTENT, rm);
         tmpBigNat = new BigNat(modulo.length(), JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT, rm);
@@ -296,8 +296,8 @@ public class Musig2 {
         digestPoint(groupPubKey, false);
 
         digest.doFinal(messageBuffer, offset, length, tmpArray, (short) 0);
-        challangeE.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
-        challangeE.mod(modulo);
+        challengeE.fromByteArray(tmpArray, (short) 0, Constants.HASH_LEN);
+        challengeE.mod(modulo);
     }
 
     // Creates the partial signature itself
@@ -311,7 +311,7 @@ public class Musig2 {
             }
         }
 
-        partialSig.copy(challangeE);
+        partialSig.copy(challengeE);
 
         // CoefA is a public coeficient and is often equal to 1
         if (!coefA.isOne()) {
@@ -366,7 +366,7 @@ public class Musig2 {
             secNonce[i].erase();
         }
 
-        challangeE.erase();
+        challengeE.erase();
         coefB.erase();
         coefR.randomize();
 
@@ -566,7 +566,7 @@ public class Musig2 {
         secretShare = null;
         coefA = null;
         coefB = null;
-        challangeE = null;
+        challengeE = null;
         partialSig = null;
         modulo = null;
         secNonce = null;
