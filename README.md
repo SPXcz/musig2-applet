@@ -23,6 +23,8 @@ transaction costs for large group of signers.
 
 Developed as a part of a master's thesis by Ondřej Chudáček (SPXcz) under supervision of Antonín Dufka ([dufkan](https://github.com/dufkan)).
 
+Showcase of MuSig2JC integrated into MeeSign [here](https://www.youtube.com/watch?v=quYqVv70ryI).
+
 ## JavaCard Template project with Gradle
 
 [![Build Status](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu.svg?branch=master)](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu)
