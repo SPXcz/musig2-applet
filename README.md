@@ -25,6 +25,22 @@ Developed as a part of a master's thesis by Ondřej Chudáček (SPXcz) under sup
 
 Showcase of MuSig2JC integrated into MeeSign [here](https://www.youtube.com/watch?v=quYqVv70ryI).
 
+## Important Notice
+
+MuSig2JC diverges from BIP-327 in the following areas:
+
+- Aggregate key tweaks are not supported.
+- Message length can be only up to 32766 bytes instead of 2^61-1 bytes.
+- If aggnonce is a point in infinity, the card throws an error. (Problem with JCMathLib)
+
+Musig2JC has been developed with side channels and fault injection in mind but has not been thoroughly tested in a lab. 
+I strongly recommend to first test the card yourself before moving to production.
+
+The card in the repository is set to DEBUG mode and must be manually set to production mode before real world use. Change the following constants in ``applet.Constants`` class:
+
+- ``CARD_TYPE = jcmathlib.OperationSupport.JCOP4_P71`` (for JCOP4)
+- ``DEBUG = Constants.STATE_FALSE``
+
 ## JavaCard Template project with Gradle
 
 [![Build Status](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu.svg?branch=master)](https://travis-ci.org/crocs-muni/javacard-gradle-template-edu)
