@@ -210,6 +210,10 @@ public class Musig2 {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
+        if (stateKeysEstablished != Constants.STATE_TRUE) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
         if (msgLength > Constants.MAX_MESSAGE_LEN) {
             ISOException.throwIt(Constants.E_MESSAGE_TOO_LONG);
             return (short) -1;
@@ -231,6 +235,9 @@ public class Musig2 {
             }
         }
 
+        stateReadyForSigning = Constants.STATE_FALSE;
+        stateNoncesAggregated = Constants.STATE_FALSE;
+
         generateCoefB(messageBuffer, inOffset, msgLength);
         generateCoefR();
         generateChallengeE(messageBuffer, inOffset, msgLength);
@@ -240,18 +247,10 @@ public class Musig2 {
 
         eraseNonce();
 
-        stateReadyForSigning = Constants.STATE_FALSE;
-        stateNoncesAggregated = Constants.STATE_FALSE;
-
         return modulo.length();
     }
 
     private void generateCoefB (byte[] messageBuffer, short offset, short length) {
-
-        if (stateNoncesAggregated != Constants.STATE_TRUE || stateKeysEstablished != Constants.STATE_TRUE) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-            return;
-        }
 
         digest.init(HashCustom.MUSIG_NONCECOEF);
 
@@ -272,11 +271,6 @@ public class Musig2 {
 
     private void generateCoefR () {
 
-        if (stateNoncesAggregated != Constants.STATE_TRUE) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-            return;
-        }
-
         // Initalize R using R1
         coefR.copy(aggNonce[1]);
 
@@ -284,11 +278,6 @@ public class Musig2 {
     }
 
     private void generateChallengeE (byte[] messageBuffer, short offset, short length) {
-
-        if (stateNoncesAggregated != Constants.STATE_TRUE || stateKeysEstablished != Constants.STATE_TRUE) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-            return;
-        }
 
         digest.init(HashCustom.BIP_CHALLENGE);
 
